@@ -4,10 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0d0e14">
-<title>Fluxplay — Complete All-in-One Suite</title>
-
-<!-- HLS.js for Streaming -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+<title>Fluxplay — Direct Media & Batch Downloader</title>
 
 <!-- JSZip & FileSaver -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -30,7 +27,6 @@
     --md-sys-color-on-primary: #1e1b4b;
     --md-sys-color-accent: #f43f5e;
     --md-sys-color-outline: rgba(255, 255, 255, 0.08);
-    --md-sys-color-outline-bright: rgba(255, 255, 255, 0.16);
     --md-sys-color-text: #f3f4f6;
     --md-sys-color-text-subtle: #9ca3af;
     --md-sys-color-error: #fb7185;
@@ -106,7 +102,7 @@
     padding: 6px 16px calc(80px + env(safe-area-inset-bottom)) 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
 
   /* Player Card */
@@ -121,10 +117,10 @@
     border: 1px solid var(--md-sys-color-outline);
   }
 
-  .player-card.is-fullscreen {
+  .player-card.fakefs {
     position: fixed !important;
     inset: 0 !important;
-    z-index: 2147483647 !important;
+    z-index: 999999 !important;
     width: 100vw !important;
     height: 100dvh !important;
     border-radius: 0 !important;
@@ -132,59 +128,51 @@
     aspect-ratio: auto !important;
   }
 
-  video { width: 100%; height: 100%; display: block; object-fit: contain; background: #000; pointer-events: none; }
+  video { width: 100%; height: 100%; display: block; object-fit: contain; background: #000; }
 
-  .gesture-surface { position: absolute; inset: 0; z-index: 4; display: grid; grid-template-columns: 1fr 1fr; }
+  .gesture-surface { position: absolute; inset: 0; z-index: 3; display: grid; grid-template-columns: 1fr 1fr; touch-action: manipulation; }
   .touch-half { width: 100%; height: 100%; }
 
   .player-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--md-sys-color-text-subtle); z-index: 2; }
   .player-empty .material-symbols-rounded { font-size: 42px; color: var(--md-sys-color-primary); }
   .player-card.has-src .player-empty { display: none; }
 
-  .spinner-box { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); pointer-events: none; z-index: 6; }
-  .spinner-box.active { display: flex; }
+  .spinner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); pointer-events: none; z-index: 5; }
+  .spinner.show { display: flex; }
   .spinner-ring { width: 38px; height: 38px; border-radius: 50%; border: 3.5px solid rgba(255,255,255,0.15); border-top-color: var(--md-sys-color-primary); animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .err-banner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(13, 14, 20, 0.96); padding: 20px; text-align: center; font-size: 13px; color: var(--md-sys-color-error); z-index: 7; }
+  .err-banner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(13, 14, 20, 0.96); padding: 20px; text-align: center; font-size: 13px; color: var(--md-sys-color-error); z-index: 6; }
   .err-banner.show { display: flex; }
 
-  .toast-feedback {
+  .skip-feedback {
     position: absolute; top: 0; bottom: 0; width: 40%;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 13px; z-index: 5; opacity: 0;
+    color: #fff; font-weight: 700; font-size: 13px; z-index: 4; opacity: 0;
     pointer-events: none; transition: opacity 0.2s;
   }
-  .toast-feedback.left { left: 0; background: radial-gradient(circle at 30% 50%, rgba(167, 139, 250, 0.35), transparent 70%); }
-  .toast-feedback.right { right: 0; background: radial-gradient(circle at 70% 50%, rgba(167, 139, 250, 0.35), transparent 70%); }
-  .toast-feedback.show { opacity: 1; }
-  .toast-feedback .material-symbols-rounded { font-size: 32px; }
+  .skip-feedback.left { left: 0; background: radial-gradient(circle at 30% 50%, rgba(167, 139, 250, 0.25), transparent 70%); }
+  .skip-feedback.right { right: 0; background: radial-gradient(circle at 70% 50%, rgba(167, 139, 250, 0.25), transparent 70%); }
+  .skip-feedback.show { opacity: 1; }
+  .skip-feedback .material-symbols-rounded { font-size: 32px; }
 
   .player-ui {
     position: absolute; inset: 0;
     background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.65) 100%);
     display: flex; flex-direction: column; justify-content: space-between;
     padding: 12px; opacity: 1; transition: opacity 0.22s ease;
-    z-index: 8; pointer-events: auto;
+    z-index: 7; pointer-events: auto;
   }
-  .player-card.hide-controls .player-ui { opacity: 0; pointer-events: none; }
-
-  .now-playing-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .current-ep-title {
-    font-size: 12px; font-weight: 700; color: var(--md-sys-color-primary);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: var(--radius-full);
-    border: 1px solid rgba(255,255,255,0.1); max-width: 70%;
-  }
+  .player-card.hide-ui .player-ui { opacity: 0; pointer-events: none; }
 
   .center-controls {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    display: flex; align-items: center; gap: 12px;
-    z-index: 9;
+    display: flex; align-items: center; gap: 18px;
+    z-index: 8;
   }
   .btn-circle {
-    width: 44px; height: 44px; border-radius: 50%;
+    width: 48px; height: 48px; border-radius: 50%;
     background: rgba(30, 31, 45, 0.85); backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.1); color: #fff;
     display: flex; align-items: center; justify-content: center;
@@ -192,17 +180,17 @@
   }
   .btn-circle:active { transform: scale(0.9); }
   .btn-circle.play-btn {
-    width: 54px; height: 54px;
+    width: 56px; height: 56px;
     background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-primary-dark));
     color: white; border: none; box-shadow: 0 4px 16px rgba(167, 139, 250, 0.4);
   }
 
   .bottom-controls { display: flex; flex-direction: column; gap: 4px; }
-  .seek-container { position: relative; height: 26px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
-  .seek-track { width: 100%; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.2); position: relative; }
-  .seek-buffer { position: absolute; height: 100%; left: 0; background: rgba(255,255,255,0.35); border-radius: 3px; }
-  .seek-fill { position: absolute; height: 100%; left: 0; background: var(--md-sys-color-primary); border-radius: 3px; }
-  .seek-thumb { position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #fff; transform: translateX(-50%); box-shadow: 0 0 8px rgba(0,0,0,0.8); pointer-events: none; }
+  .seek-slider-container { position: relative; height: 24px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+  .seek-track { width: 100%; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.2); position: relative; }
+  .seek-buffer { position: absolute; height: 100%; left: 0; background: rgba(255,255,255,0.35); border-radius: 2px; }
+  .seek-fill { position: absolute; height: 100%; left: 0; background: var(--md-sys-color-primary); border-radius: 2px; }
+  .seek-thumb { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translateX(-50%); box-shadow: 0 0 8px rgba(0,0,0,0.8); pointer-events: none; }
 
   .ctrl-bar { display: flex; align-items: center; justify-content: space-between; }
   .ctrl-actions { display: flex; align-items: center; gap: 6px; }
@@ -213,39 +201,6 @@
 
   .md-select { background: rgba(255, 255, 255, 0.12); color: #fff; border: 1px solid var(--md-sys-color-outline); border-radius: var(--radius-sm); font-size: 11px; padding: 3px 8px; outline: none; }
   .md-select option { background: var(--md-sys-color-surface); }
-
-  /* Skip Controller Action Strip */
-  .skip-tools-card {
-    background: var(--md-sys-color-surface);
-    border-radius: var(--radius-md);
-    padding: 8px 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border: 1px solid var(--md-sys-color-outline);
-  }
-  .skip-btn {
-    flex: 1;
-    background: var(--md-sys-color-surface-container);
-    border: 1px solid var(--md-sys-color-outline);
-    color: var(--md-sys-color-text);
-    padding: 9px 6px;
-    border-radius: var(--radius-md);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    white-space: nowrap;
-  }
-  .skip-btn:active { transform: scale(0.96); background: var(--md-sys-color-primary); color: #fff; }
-  .skip-btn.primary-skip {
-    background: linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(99, 102, 241, 0.2));
-    border-color: var(--md-sys-color-primary);
-    color: var(--md-sys-color-primary);
-  }
 
   /* Cards & Paneling */
   .md-card {
@@ -269,6 +224,7 @@
     justify-content: space-between;
   }
 
+  /* File Count Badge */
   .count-pill {
     background: var(--md-sys-color-surface-variant);
     border: 1px solid var(--md-sys-color-outline);
@@ -293,7 +249,7 @@
     transition: border-color 0.2s;
   }
   .md-input:focus { border-color: var(--md-sys-color-primary); }
-  textarea.md-input { resize: vertical; min-height: 85px; line-height: 1.45; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  textarea.md-input { resize: vertical; min-height: 90px; line-height: 1.45; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 
   .md-btn {
     background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-primary-dark));
@@ -327,6 +283,8 @@
     gap: 4px;
     cursor: pointer;
   }
+  .md-btn-cancel:active { background: rgba(251, 113, 133, 0.25); }
+
   .md-btn-danger {
     background: rgba(251, 113, 133, 0.12);
     color: var(--md-sys-color-error);
@@ -341,6 +299,7 @@
     gap: 6px;
     cursor: pointer;
   }
+  .md-btn-danger:active { background: rgba(251, 113, 133, 0.25); }
 
   /* Progress Telemetry Card */
   .telemetry-card {
@@ -378,8 +337,7 @@
   .archive-meta .zip-icon-bubble {
     width: 36px; height: 36px; border-radius: var(--radius-sm);
     background: rgba(167, 139, 250, 0.12); color: var(--md-sys-color-primary);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .archive-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
   .archive-size { font-size: 11px; color: var(--md-sys-color-text-subtle); font-family: 'JetBrains Mono', monospace; }
@@ -444,11 +402,10 @@
   </div>
 
   <div class="content-scroll">
-    <!-- Hardware Direct Video Player Card -->
+    <!-- Video Player Card -->
     <div class="player-card" id="playerCard">
-      <video id="video" playsinline webkit-playsinline preload="auto"></video>
+      <video id="video" playsinline webkit-playsinline preload="metadata"></video>
 
-      <!-- Transparent Gesture Surface -->
       <div class="gesture-surface" id="gestureSurface">
         <div class="touch-half" id="touchLeft"></div>
         <div class="touch-half" id="touchRight"></div>
@@ -459,22 +416,21 @@
         <span style="font-size: 13px; font-weight: 500;">Load a video link below</span>
       </div>
 
-      <div class="spinner-box" id="spinnerBox"><div class="spinner-ring"></div></div>
+      <div class="spinner" id="spinner"><div class="spinner-ring"></div></div>
       <div class="err-banner" id="errBanner">Unable to load video. Check the link or CORS policy.</div>
 
-      <div class="toast-feedback left" id="toastLeft">
+      <div class="skip-feedback left" id="animSkipLeft">
         <span class="material-symbols-rounded">replay_10</span>
         <span>-10s</span>
       </div>
-      <div class="toast-feedback right" id="toastRight">
+      <div class="skip-feedback right" id="animSkipRight">
         <span class="material-symbols-rounded">forward_10</span>
         <span>+10s</span>
       </div>
 
       <!-- Player Overlay UI -->
       <div class="player-ui" id="playerUi">
-        <div class="now-playing-bar">
-          <div class="current-ep-title" id="currentEpLabel">Direct Stream</div>
+        <div style="display:flex; justify-content:flex-end;">
           <select class="md-select" id="speedSelect">
             <option value="0.75">0.75x</option>
             <option value="1" selected>1.0x</option>
@@ -497,7 +453,7 @@
         </div>
 
         <div class="bottom-controls">
-          <div class="seek-container" id="seekContainer">
+          <div class="seek-slider-container" id="seekWrap">
             <div class="seek-track">
               <div class="seek-buffer" id="seekBuffer" style="width:0%"></div>
               <div class="seek-fill" id="seekFill" style="width:0%"></div>
@@ -520,26 +476,10 @@
       </div>
     </div>
 
-    <!-- Quick Jump & Video Adjust Controls -->
-    <div class="skip-tools-card">
-      <button class="skip-btn primary-skip" id="btnSkipIntro85">
-        <span class="material-symbols-rounded">fast_forward</span>
-        Skip Intro (+85s)
-      </button>
-      <button class="skip-btn" id="btnFwd30">
-        <span class="material-symbols-rounded">forward_30</span>
-        +30s
-      </button>
-      <button class="skip-btn" id="btnBack30">
-        <span class="material-symbols-rounded">replay_30</span>
-        -30s
-      </button>
-    </div>
-
     <!-- View 1: Stream Tab -->
     <div class="md-card" id="streamPanel">
-      <span class="card-label">Instant Stream Link</span>
-      <input class="md-input" id="streamUrl" type="text" placeholder="https://example.com/video.mp4 or .m3u8" inputmode="url" value="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4">
+      <span class="card-label">Instant Video Stream</span>
+      <input class="md-input" id="streamUrl" type="text" placeholder="https://example.com/video.mp4" inputmode="url">
       <button class="md-btn" id="btnStream">
         <span class="material-symbols-rounded">play_arrow</span>
         Play Stream
@@ -591,8 +531,6 @@
             <span class="stat-value" id="statSpeed">0 MB/s</span>
           </div>
         </div>
-
-        <div id="zipLog" style="display:none; flex-direction:column; gap:3px; max-height:110px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--md-sys-color-text-subtle); background:rgba(0,0,0,0.2); border-radius:var(--radius-sm); padding:8px;"></div>
       </div>
 
       <!-- Persistent Storage Pool -->
@@ -649,7 +587,7 @@
   const video = $('video');
   const playerCard = $('playerCard');
   const statusChip = $('statusChip');
-  const spinnerBox = $('spinnerBox');
+  const spinner = $('spinner');
   const errBanner = $('errBanner');
   
   const streamUrl = $('streamUrl');
@@ -658,9 +596,6 @@
   const playIcon = $('playIcon');
   const btnBack10 = $('btnBack10');
   const btnFwd10 = $('btnFwd10');
-  const btnSkipIntro85 = $('btnSkipIntro85');
-  const btnFwd30 = $('btnFwd30');
-  const btnBack30 = $('btnBack30');
   
   const btnMute = $('btnMute');
   const muteIcon = $('muteIcon');
@@ -669,13 +604,13 @@
   const speedSelect = $('speedSelect');
   const timeLabel = $('timeLabel');
 
-  const seekContainer = $('seekContainer');
+  const seekWrap = $('seekWrap');
   const seekFill = $('seekFill');
   const seekBuffer = $('seekBuffer');
   const seekThumb = $('seekThumb');
 
-  const toastLeft = $('toastLeft');
-  const toastRight = $('toastRight');
+  const animSkipLeft = $('animSkipLeft');
+  const animSkipRight = $('animSkipRight');
 
   const navStream = $('navStream');
   const navZip = $('navZip');
@@ -697,7 +632,6 @@
   const zipBar = $('zipBar');
   const statSize = $('statSize');
   const statSpeed = $('statSpeed');
-  const zipLog = $('zipLog');
   const archivesSection = $('archivesSection');
   const archivesList = $('archivesList');
 
@@ -709,234 +643,6 @@
   let isScrubbing = false;
   let wasPlaying = false;
   let currentAbortController = null;
-  let hlsInstance = null;
-
-  function setStatus(text, type = 'default') {
-    statusChip.textContent = text;
-    statusChip.className = 'status-chip' + (type === 'live' ? ' live' : type === 'canceled' ? ' canceled' : '');
-  }
-
-  function fmtTime(sec) {
-    if (!isFinite(sec) || sec < 0) return "0:00";
-    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
-    return `${m}:${String(s).padStart(2, '0')}`;
-  }
-
-  function showUI() {
-    playerCard.classList.remove('hide-controls');
-    clearTimeout(uiTimer);
-    uiTimer = setTimeout(() => {
-      if (!video.paused && !isScrubbing) playerCard.classList.add('hide-controls');
-    }, 3200);
-  }
-
-  function playSource(url) {
-    if (!url) return;
-    errBanner.classList.remove('show');
-    spinnerBox.classList.add('active');
-    playerCard.classList.add('has-src');
-    setStatus('Loading…');
-
-    const isHls = url.includes('.m3u8');
-
-    if (isHls && Hls.isSupported()) {
-      if (hlsInstance) hlsInstance.destroy();
-      hlsInstance = new Hls({ enableWorker: true, lowLatencyMode: true });
-      hlsInstance.loadSource(url);
-      hlsInstance.attachMedia(video);
-      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
-      hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-          errBanner.classList.add('show');
-          setStatus('Error', 'canceled');
-        }
-      });
-    } else {
-      if (hlsInstance) {
-        hlsInstance.destroy();
-        hlsInstance = null;
-      }
-      video.src = url;
-      video.load();
-      video.play().catch(() => {});
-    }
-  }
-
-  btnStream.addEventListener('click', () => playSource(streamUrl.value.trim()));
-  streamUrl.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnStream.click(); });
-
-  // =========================================================================
-  // HARDWARE-DIRECT KEYFRAME SKIP ENGINE
-  // =========================================================================
-  function executePreciseSeek(seconds) {
-    if (!video.src && !hlsInstance) return;
-    const maxDur = isFinite(video.duration) ? video.duration : Infinity;
-    const current = video.currentTime || 0;
-    const target = Math.min(maxDur, Math.max(0, current + seconds));
-
-    if ('fastSeek' in video) {
-      try {
-        video.fastSeek(target);
-      } catch (e) {
-        video.currentTime = target;
-      }
-    } else {
-      video.currentTime = target;
-    }
-
-    updateSeekUI();
-    showUI();
-  }
-
-  btnSkipIntro85.addEventListener('click', () => executePreciseSeek(85));
-  btnFwd30.addEventListener('click', () => executePreciseSeek(30));
-  btnBack30.addEventListener('click', () => executePreciseSeek(-30));
-
-  btnBack10.addEventListener('click', () => {
-    executePreciseSeek(-10);
-    toastLeft.classList.add('show');
-    setTimeout(() => toastLeft.classList.remove('show'), 350);
-  });
-  btnFwd10.addEventListener('click', () => {
-    executePreciseSeek(10);
-    toastRight.classList.add('show');
-    setTimeout(() => toastRight.classList.remove('show'), 350);
-  });
-
-  // Touch Gesture Handling
-  let lastTap = 0;
-  let tapTimer = null;
-
-  function handleTouchZone(side) {
-    const now = Date.now();
-    if (now - lastTap < 300) {
-      clearTimeout(tapTimer);
-      if (side === 'left') {
-        executePreciseSeek(-10);
-        toastLeft.classList.add('show');
-        setTimeout(() => toastLeft.classList.remove('show'), 350);
-      } else {
-        executePreciseSeek(10);
-        toastRight.classList.add('show');
-        setTimeout(() => toastRight.classList.remove('show'), 350);
-      }
-    } else {
-      tapTimer = setTimeout(() => {
-        if (playerCard.classList.contains('hide-controls')) showUI();
-        else playerCard.classList.add('hide-controls');
-      }, 260);
-    }
-    lastTap = now;
-  }
-
-  $('touchLeft').addEventListener('pointerdown', (e) => { e.preventDefault(); handleTouchZone('left'); });
-  $('touchRight').addEventListener('pointerdown', (e) => { e.preventDefault(); handleTouchZone('right'); });
-
-  function togglePlay() {
-    if (!video.src && !hlsInstance) return;
-    if (video.paused) video.play().catch(() => {});
-    else video.pause();
-    showUI();
-  }
-  btnPlayCenter.addEventListener('click', togglePlay);
-
-  function updateSeekUI() {
-    const d = video.duration;
-    if (d && isFinite(d)) {
-      const pct = (video.currentTime / d) * 100;
-      seekFill.style.width = pct + '%';
-      seekThumb.style.left = pct + '%';
-      timeLabel.textContent = `${fmtTime(video.currentTime)} / ${fmtTime(d)}`;
-
-      if (video.buffered.length) {
-        const buf = video.buffered.end(video.buffered.length - 1);
-        seekBuffer.style.width = (buf / d * 100) + '%';
-      }
-    } else {
-      timeLabel.textContent = `${fmtTime(video.currentTime)} / LIVE`;
-    }
-  }
-
-  function seekTo(clientX) {
-    const rect = seekContainer.getBoundingClientRect();
-    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    if (isFinite(video.duration)) {
-      video.currentTime = pct * video.duration;
-      updateSeekUI();
-    }
-  }
-
-  seekContainer.addEventListener('pointerdown', (e) => {
-    isScrubbing = true;
-    wasPlaying = !video.paused;
-    video.pause();
-    seekTo(e.clientX);
-    showUI();
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-  });
-  function onMove(e) { if (isScrubbing) seekTo(e.clientX); }
-  function onUp() {
-    if (isScrubbing) {
-      isScrubbing = false;
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      if (wasPlaying) video.play().catch(() => {});
-      showUI();
-    }
-  }
-
-  btnMute.addEventListener('click', () => {
-    video.muted = !video.muted;
-    muteIcon.textContent = video.muted ? 'volume_off' : 'volume_up';
-    showUI();
-  });
-
-  speedSelect.addEventListener('change', () => video.playbackRate = parseFloat(speedSelect.value));
-
-  // Fullscreen with Orientation Lock
-  async function toggleFullscreen() {
-    try {
-      if (!document.fullscreenElement && !playerCard.classList.contains('is-fullscreen')) {
-        if (playerCard.requestFullscreen) await playerCard.requestFullscreen();
-        playerCard.classList.add('is-fullscreen');
-        fsIcon.textContent = 'fullscreen_exit';
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock('landscape').catch(() => {});
-        }
-      } else {
-        if (document.exitFullscreen) await document.exitFullscreen();
-        playerCard.classList.remove('is-fullscreen');
-        fsIcon.textContent = 'fullscreen';
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock().catch(() => {});
-        }
-      }
-    } catch (err) {
-      playerCard.classList.toggle('is-fullscreen');
-      fsIcon.textContent = playerCard.classList.contains('is-fullscreen') ? 'fullscreen_exit' : 'fullscreen';
-    }
-  }
-  btnFs.addEventListener('click', toggleFullscreen);
-
-  document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement) {
-      playerCard.classList.remove('is-fullscreen');
-      fsIcon.textContent = 'fullscreen';
-    }
-  });
-
-  video.addEventListener('play', () => { playIcon.textContent = 'pause'; setStatus('Playing', 'live'); showUI(); });
-  video.addEventListener('pause', () => { playIcon.textContent = 'play_arrow'; setStatus('Paused'); showUI(); });
-  video.addEventListener('timeupdate', updateSeekUI);
-  video.addEventListener('waiting', () => spinnerBox.classList.add('active'));
-  video.addEventListener('playing', () => spinnerBox.classList.remove('active'));
-  video.addEventListener('loadedmetadata', () => { updateSeekUI(); spinnerBox.classList.remove('active'); });
-  video.addEventListener('error', () => {
-    spinnerBox.classList.remove('active');
-    errBanner.classList.add('show');
-    setStatus('Error', 'canceled');
-  });
 
   // Simple File Counter
   zipUrls.addEventListener('input', () => {
@@ -967,7 +673,7 @@
         dbInstance = e.target.result;
         resolve(dbInstance);
       };
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror = (e) => reject(e);
     });
   }
 
@@ -979,7 +685,7 @@
       const record = { name, blob, count, createdAt: Date.now(), size: blob.size };
       const req = store.add(record);
       req.onsuccess = () => resolve();
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror = (e) => reject(e);
     });
   }
 
@@ -990,7 +696,7 @@
       const store = tx.objectStore(STORE_NAME);
       const req = store.getAll();
       req.onsuccess = (e) => resolve(e.target.result || []);
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror = (e) => reject(e);
     });
   }
 
@@ -1001,7 +707,7 @@
       const store = tx.objectStore(STORE_NAME);
       const req = store.delete(id);
       req.onsuccess = () => resolve();
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror = (e) => reject(e);
     });
   }
 
@@ -1012,16 +718,8 @@
       const store = tx.objectStore(STORE_NAME);
       const req = store.clear();
       req.onsuccess = () => resolve();
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror = (e) => reject(e);
     });
-  }
-
-  function formatBytes(bytes) {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
   async function refreshStorageTelemetry() {
@@ -1053,15 +751,21 @@
       item.className = 'archive-item';
       item.innerHTML = `
         <div class="archive-meta">
-          <div class="zip-icon-bubble"><span class="material-symbols-rounded">folder_zip</span></div>
+          <div class="zip-icon-bubble">
+            <span class="material-symbols-rounded">folder_zip</span>
+          </div>
           <div>
             <div class="archive-name">${arch.name}</div>
             <div class="archive-size">${formatBytes(arch.size)} • ${arch.count} files</div>
           </div>
         </div>
         <div class="archive-actions">
-          <button class="icon-btn-sm" onclick="window._reDownloadZip(${arch.id})"><span class="material-symbols-rounded">download</span></button>
-          <button class="icon-btn-sm delete" onclick="window._deleteZip(${arch.id})"><span class="material-symbols-rounded">delete</span></button>
+          <button class="icon-btn-sm" title="Re-download" onclick="window._reDownloadZip(${arch.id})">
+            <span class="material-symbols-rounded">download</span>
+          </button>
+          <button class="icon-btn-sm delete" title="Delete" onclick="window._deleteZip(${arch.id})">
+            <span class="material-symbols-rounded">delete</span>
+          </button>
         </div>
       `;
       archivesList.appendChild(item);
@@ -1087,7 +791,7 @@
     }
   });
 
-  // Navigation Tab Switching
+  // Tabs Switching
   function switchTab(activeBtn, activePanel) {
     [navStream, navZip, navSettings].forEach(btn => btn.classList.remove('active'));
     [streamPanel, zipPanel, settingsPanel].forEach(panel => panel.style.display = 'none');
@@ -1100,95 +804,218 @@
   navZip.addEventListener('click', () => switchTab(navZip, zipPanel));
   navSettings.addEventListener('click', () => switchTab(navSettings, settingsPanel));
 
-  // =========================================================================
-  // MULTI-ENDPOINT FETCH PIPELINE WITH AUTO-CORS FAILOVER
-  // Each candidate endpoint (direct + proxies) is tried end-to-end: if the
-  // connection drops or errors *during* streaming (very common with public
-  // CORS proxies on larger files), we now fall back to the next endpoint
-  // instead of letting the whole file — and previously the whole batch —
-  // die with no retry.
-  // =========================================================================
-  function logZip(msg) {
-    if (!zipLog) return;
-    zipLog.style.display = 'flex';
-    const line = document.createElement('div');
-    line.textContent = msg;
-    zipLog.appendChild(line);
-    zipLog.scrollTop = zipLog.scrollHeight;
+  function setStatus(text, type = 'default') {
+    statusChip.textContent = text;
+    statusChip.className = 'status-chip' + (type === 'live' ? ' live' : type === 'canceled' ? ' canceled' : '');
   }
 
-  async function fetchWithProgress(url, signal, onChunk, label) {
+  function fmtTime(sec) {
+    if (!isFinite(sec) || sec < 0) return "0:00";
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function showUI() {
+    playerCard.classList.remove('hide-ui');
+    clearTimeout(uiTimer);
+    uiTimer = setTimeout(() => {
+      if (!video.paused && !isScrubbing) playerCard.classList.add('hide-ui');
+    }, 3000);
+  }
+
+  function playSource(url) {
+    if (!url) return;
+    errBanner.classList.remove('show');
+    playerCard.classList.add('has-src');
+    spinner.classList.add('show');
+    setStatus('Loading…');
+    video.src = url;
+    video.load();
+    video.play().then(() => setStatus('Playing', 'live')).catch(() => {});
+  }
+
+  btnStream.addEventListener('click', () => {
+    const url = streamUrl.value.trim();
+    if (url) playSource(url);
+  });
+  streamUrl.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnStream.click(); });
+
+  function togglePlay() {
+    if (!video.src) return;
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
+    showUI();
+  }
+
+  function doSkip(seconds) {
+    if (!video.src || !isFinite(video.duration)) return;
+    video.currentTime = Math.min(Math.max(0, video.currentTime + seconds), video.duration);
+    updateSeekUI();
+    showUI();
+  }
+
+  btnPlayCenter.addEventListener('click', togglePlay);
+  btnBack10.addEventListener('click', () => {
+    doSkip(-10);
+    animSkipLeft.classList.add('show');
+    setTimeout(() => animSkipLeft.classList.remove('show'), 350);
+  });
+  btnFwd10.addEventListener('click', () => {
+    doSkip(10);
+    animSkipRight.classList.add('show');
+    setTimeout(() => animSkipRight.classList.remove('show'), 350);
+  });
+
+  let lastTapTime = 0;
+  let tapTimer = null;
+  function handleTouchZone(side) {
+    const now = Date.now();
+    if (now - lastTapTime < 300) {
+      clearTimeout(tapTimer);
+      if (side === 'left') { doSkip(-10); animSkipLeft.classList.add('show'); setTimeout(() => animSkipLeft.classList.remove('show'), 350); }
+      else { doSkip(10); animSkipRight.classList.add('show'); setTimeout(() => animSkipRight.classList.remove('show'), 350); }
+    } else {
+      tapTimer = setTimeout(() => {
+        if (playerCard.classList.contains('hide-ui')) showUI();
+        else playerCard.classList.add('hide-ui');
+      }, 280);
+    }
+    lastTapTime = now;
+  }
+
+  $('touchLeft').addEventListener('pointerdown', (e) => { e.preventDefault(); handleTouchZone('left'); });
+  $('touchRight').addEventListener('pointerdown', (e) => { e.preventDefault(); handleTouchZone('right'); });
+
+  function updateSeekUI() {
+    const d = video.duration;
+    if (d && isFinite(d)) {
+      const pct = (video.currentTime / d) * 100;
+      seekFill.style.width = pct + '%';
+      seekThumb.style.left = pct + '%';
+      timeLabel.textContent = `${fmtTime(video.currentTime)} / ${fmtTime(d)}`;
+      if (video.buffered.length) {
+        const buf = video.buffered.end(video.buffered.length - 1);
+        seekBuffer.style.width = (buf / d * 100) + '%';
+      }
+    }
+  }
+
+  function seekTo(clientX) {
+    const rect = seekWrap.getBoundingClientRect();
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    if (isFinite(video.duration)) {
+      video.currentTime = pct * video.duration;
+      updateSeekUI();
+    }
+  }
+
+  seekWrap.addEventListener('pointerdown', (e) => {
+    isScrubbing = true;
+    wasPlaying = !video.paused;
+    video.pause();
+    seekTo(e.clientX);
+    showUI();
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
+  function onMove(e) { if (isScrubbing) seekTo(e.clientX); }
+  function onUp() {
+    if (isScrubbing) {
+      isScrubbing = false;
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if (wasPlaying) video.play().catch(() => {});
+      showUI();
+    }
+  }
+
+  btnMute.addEventListener('click', () => {
+    video.muted = !video.muted;
+    muteIcon.textContent = video.muted ? 'volume_off' : 'volume_up';
+    showUI();
+  });
+
+  speedSelect.addEventListener('change', () => video.playbackRate = parseFloat(speedSelect.value));
+
+  btnFs.addEventListener('click', () => {
+    if (playerCard.classList.contains('fakefs')) {
+      playerCard.classList.remove('fakefs');
+      fsIcon.textContent = 'fullscreen';
+    } else {
+      playerCard.classList.add('fakefs');
+      fsIcon.textContent = 'fullscreen_exit';
+    }
+  });
+
+  video.addEventListener('play', () => { playIcon.textContent = 'pause'; setStatus('Playing', 'live'); showUI(); });
+  video.addEventListener('pause', () => { playIcon.textContent = 'play_arrow'; setStatus('Paused'); showUI(); });
+  video.addEventListener('timeupdate', updateSeekUI);
+  video.addEventListener('loadedmetadata', () => { updateSeekUI(); spinner.classList.remove('show'); });
+  video.addEventListener('waiting', () => spinner.classList.add('show'));
+  video.addEventListener('playing', () => spinner.classList.remove('show'));
+  video.addEventListener('error', () => {
+    spinner.classList.remove('show');
+    errBanner.classList.add('show');
+    setStatus('Error');
+  });
+
+  // Resilient Fetch with Chunked Stream
+  async function fetchWithProgress(url, signal, onChunk) {
     const proxyList = [
-      { url: url, name: 'direct' },
-      { url: `https://corsproxy.io/?url=${encodeURIComponent(url)}`, name: 'corsproxy.io' },
-      { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, name: 'allorigins' },
-      { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, name: 'codetabs' }
+      url,
+      `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
     ];
 
-    let lastError = null;
-
+    let response = null;
     for (const endpoint of proxyList) {
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-
       try {
-        const res = await fetch(endpoint.url, { signal });
-
-        if (!res.ok) {
-          lastError = new Error(`HTTP ${res.status} via ${endpoint.name}`);
-          logZip(`${label}: ${endpoint.name} → HTTP ${res.status}, trying next source`);
-          continue;
-        }
-
-        const contentLength = +(res.headers.get('Content-Length') || 0);
-
-        // The actual streaming read now lives INSIDE this endpoint's try block.
-        // A drop mid-stream throws here and is caught below, so we move on to
-        // the next proxy instead of aborting the whole file/batch.
-        if (res.body && res.body.getReader) {
-          const reader = res.body.getReader();
-          let receivedLength = 0;
-          const chunks = [];
-
-          while (true) {
-            if (signal.aborted) {
-              reader.cancel();
-              throw new DOMException('Aborted', 'AbortError');
-            }
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-            receivedLength += value.length;
-            onChunk(receivedLength, contentLength, value.length);
-          }
-
-          if (receivedLength === 0) {
-            lastError = new Error(`Empty response via ${endpoint.name}`);
-            logZip(`${label}: ${endpoint.name} → empty response, trying next source`);
-            onChunk(0, 0, 0);
-            continue;
-          }
-
-          return new Blob(chunks);
-        } else {
-          const blob = await res.blob();
-          if (blob.size === 0) {
-            lastError = new Error(`Empty response via ${endpoint.name}`);
-            logZip(`${label}: ${endpoint.name} → empty response, trying next source`);
-            onChunk(0, 0, 0);
-            continue;
-          }
-          onChunk(blob.size, blob.size, blob.size);
-          return blob;
+        const res = await fetch(endpoint, { signal });
+        if (res.ok) {
+          response = res;
+          break;
         }
       } catch (e) {
-        if (signal.aborted || e.name === 'AbortError') throw e;
-        lastError = e;
-        logZip(`${label}: ${endpoint.name} → ${e.message || 'failed'}, trying next source`);
-        onChunk(0, 0, 0); // reset this file's progress before retrying with a new source
+        if (signal.aborted) throw e;
       }
     }
 
-    throw lastError || new Error('Failed to download source link');
+    if (!response) throw new Error('Could not fetch file from any origin');
+
+    const contentLength = +(response.headers.get('Content-Length') || 0);
+    
+    if (response.body && response.body.getReader) {
+      const reader = response.body.getReader();
+      let receivedLength = 0;
+      const chunks = [];
+
+      while (true) {
+        if (signal.aborted) {
+          reader.cancel();
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        receivedLength += value.length;
+        onChunk(receivedLength, contentLength, value.length);
+      }
+      return new Blob(chunks);
+    } else {
+      const blob = await response.blob();
+      onChunk(blob.size, blob.size, blob.size);
+      return blob;
+    }
   }
 
   btnCancelDownload.addEventListener('click', () => {
@@ -1208,8 +1035,6 @@
     const { signal } = currentAbortController;
 
     telemetryBox.classList.add('active');
-    zipLog.innerHTML = '';
-    zipLog.style.display = 'none';
     btnZipDownload.disabled = true;
     btnCancelDownload.style.display = 'inline-flex';
 
@@ -1218,7 +1043,6 @@
     const fileProgress = new Array(totalFiles).fill(0);
     const fileSizes = new Array(totalFiles).fill(0);
     let completedFiles = 0;
-    let failedFiles = 0;
 
     let lastBytesSample = 0;
     let lastTimeSample = Date.now();
@@ -1231,7 +1055,7 @@
       const elapsed = (now - lastTimeSample) / 1000;
       if (elapsed >= 0.5) {
         const bytesDiff = totalDownloaded - lastBytesSample;
-        const currentSpeed = Math.max(0, bytesDiff / elapsed);
+        const currentSpeed = bytesDiff / elapsed;
         statSpeed.textContent = `${formatBytes(currentSpeed)}/s`;
         lastBytesSample = totalDownloaded;
         lastTimeSample = now;
@@ -1256,72 +1080,56 @@
       zipStatus.textContent = `Streaming chunks...`;
     };
 
-    const usedNames = new Set();
     const sanitizeName = (url, idx) => {
-      let name;
       try {
-        const pathname = new URL(url).pathname;
-        const candidate = pathname.substring(pathname.lastIndexOf('/') + 1);
-        name = (candidate && candidate.includes('.')) ? candidate : `File_${String(idx + 1).padStart(2, '0')}.mp4`;
-      } catch (e) {
-        name = `File_${String(idx + 1).padStart(2, '0')}.mp4`;
-      }
-      // Avoid silently overwriting files that sanitize to the same name
-      if (usedNames.has(name)) {
-        const dot = name.lastIndexOf('.');
-        const base = dot > -1 ? name.slice(0, dot) : name;
-        const ext = dot > -1 ? name.slice(dot) : '';
-        name = `${base}_${idx + 1}${ext}`;
-      }
-      usedNames.add(name);
-      return name;
+        const u = new URL(url).pathname;
+        const name = u.substring(u.lastIndexOf('/') + 1);
+        if (name && name.includes('.')) return name;
+      } catch (e) {}
+      return `File_${String(idx + 1).padStart(2, '0')}.mp4`;
     };
 
-    try {
-      // Fetch files sequentially to avoid memory crashes
-      for (let idx = 0; idx < urls.length; idx++) {
-        const url = urls[idx];
-        const fileName = sanitizeName(url, idx);
-        try {
-          const blob = await fetchWithProgress(url, signal, (received, total) => {
-            fileProgress[idx] = received;
-            if (total) fileSizes[idx] = total;
-            updateTelemetryUI();
-          }, fileName);
-          zip.file(fileName, blob, { binary: true, compression: "STORE" });
-        } catch (err) {
-          if (err.name === 'AbortError') throw err;
-          failedFiles++;
-          logZip(`${fileName}: all sources failed (${err.message || 'unknown error'})`);
-          zip.file(`${fileName}_ERROR.txt`, `Download Failed for ${url}\nError: ${err.message}`);
-        } finally {
-          completedFiles++;
+    const tasks = urls.map(async (url, idx) => {
+      const fileName = sanitizeName(url, idx);
+      try {
+        const blob = await fetchWithProgress(url, signal, (received, total) => {
+          fileProgress[idx] = received;
+          if (total) fileSizes[idx] = total;
           updateTelemetryUI();
-        }
+        });
+        zip.file(fileName, blob, { binary: true, compression: "STORE" });
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        zip.file(`${fileName}_ERROR.txt`, `Download Failed for ${url}\nError: ${err.message}`);
+      } finally {
+        completedFiles++;
+        updateTelemetryUI();
       }
+    });
 
+    try {
+      await Promise.all(tasks);
+      
       const totalDownloaded = fileProgress.reduce((a, b) => a + b, 0);
-      zipStatus.textContent = 'Packaging .ZIP...';
+      zipStatus.textContent = 'Building .ZIP Package...';
       statSize.textContent = `${formatBytes(totalDownloaded)} (Final Size)`;
       statSpeed.textContent = 'Finalizing...';
+      zipPct.textContent = '96%';
+      zipBar.style.width = '96%';
       btnCancelDownload.style.display = 'none';
 
-      // Pass progress handler to zip generation
-      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' }, (meta) => {
-          zipPct.textContent = `${meta.percent.toFixed(0)}%`;
-          zipBar.style.width = `${meta.percent.toFixed(0)}%`;
-          statSpeed.textContent = 'Zipping...';
+      const zipBlob = await zip.generateAsync({
+        type: 'blob',
+        compression: 'STORE'
       });
-      
+
       const outName = (zipName.value.trim() || 'Files_Batch') + '.zip';
       saveAs(zipBlob, outName);
 
       await saveArchiveToDB(outName, zipBlob, urls.length);
       await renderArchives();
 
-      zipStatus.textContent = failedFiles > 0
-        ? `Done — ${failedFiles} of ${totalFiles} file(s) failed (see log)`
-        : 'Download Complete & Stored!';
+      zipStatus.textContent = 'Download Complete & Stored!';
       statSpeed.textContent = '0 B/s';
       zipPct.textContent = '100%';
       zipBar.style.width = '100%';
@@ -1335,7 +1143,6 @@
         setTimeout(() => telemetryBox.classList.remove('active'), 2500);
       } else {
         zipStatus.textContent = 'Error: ' + err.message;
-        logZip(`Fatal: ${err.message}`);
       }
     } finally {
       btnZipDownload.disabled = false;
@@ -1345,11 +1152,8 @@
 
   btnZipDownload.addEventListener('click', downloadWholeZip);
 
-  // Initialize DB & load stored items
+  // Initialize DB
   renderArchives();
-
-  // Load default demo stream
-  playSource(streamUrl.value);
 })();
 </script>
 </body>
