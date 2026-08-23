@@ -591,6 +591,8 @@
             <span class="stat-value" id="statSpeed">0 MB/s</span>
           </div>
         </div>
+
+        <div id="zipLog" style="display:none; flex-direction:column; gap:3px; max-height:110px; overflow-y:auto; font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--md-sys-color-text-subtle); background:rgba(0,0,0,0.2); border-radius:var(--radius-sm); padding:8px;"></div>
       </div>
 
       <!-- Persistent Storage Pool -->
@@ -695,6 +697,7 @@
   const zipBar = $('zipBar');
   const statSize = $('statSize');
   const statSpeed = $('statSpeed');
+  const zipLog = $('zipLog');
   const archivesSection = $('archivesSection');
   const archivesList = $('archivesList');
 
@@ -1099,55 +1102,93 @@
 
   // =========================================================================
   // MULTI-ENDPOINT FETCH PIPELINE WITH AUTO-CORS FAILOVER
+  // Each candidate endpoint (direct + proxies) is tried end-to-end: if the
+  // connection drops or errors *during* streaming (very common with public
+  // CORS proxies on larger files), we now fall back to the next endpoint
+  // instead of letting the whole file — and previously the whole batch —
+  // die with no retry.
   // =========================================================================
-  async function fetchWithProgress(url, signal, onChunk) {
+  function logZip(msg) {
+    if (!zipLog) return;
+    zipLog.style.display = 'flex';
+    const line = document.createElement('div');
+    line.textContent = msg;
+    zipLog.appendChild(line);
+    zipLog.scrollTop = zipLog.scrollHeight;
+  }
+
+  async function fetchWithProgress(url, signal, onChunk, label) {
     const proxyList = [
-      url,
-      `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+      { url: url, name: 'direct' },
+      { url: `https://corsproxy.io/?url=${encodeURIComponent(url)}`, name: 'corsproxy.io' },
+      { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, name: 'allorigins' },
+      { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, name: 'codetabs' }
     ];
 
-    let response = null;
+    let lastError = null;
+
     for (const endpoint of proxyList) {
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
       try {
-        const res = await fetch(endpoint, { signal });
-        if (res.ok) {
-          response = res;
-          break;
+        const res = await fetch(endpoint.url, { signal });
+
+        if (!res.ok) {
+          lastError = new Error(`HTTP ${res.status} via ${endpoint.name}`);
+          logZip(`${label}: ${endpoint.name} → HTTP ${res.status}, trying next source`);
+          continue;
+        }
+
+        const contentLength = +(res.headers.get('Content-Length') || 0);
+
+        // The actual streaming read now lives INSIDE this endpoint's try block.
+        // A drop mid-stream throws here and is caught below, so we move on to
+        // the next proxy instead of aborting the whole file/batch.
+        if (res.body && res.body.getReader) {
+          const reader = res.body.getReader();
+          let receivedLength = 0;
+          const chunks = [];
+
+          while (true) {
+            if (signal.aborted) {
+              reader.cancel();
+              throw new DOMException('Aborted', 'AbortError');
+            }
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            receivedLength += value.length;
+            onChunk(receivedLength, contentLength, value.length);
+          }
+
+          if (receivedLength === 0) {
+            lastError = new Error(`Empty response via ${endpoint.name}`);
+            logZip(`${label}: ${endpoint.name} → empty response, trying next source`);
+            onChunk(0, 0, 0);
+            continue;
+          }
+
+          return new Blob(chunks);
+        } else {
+          const blob = await res.blob();
+          if (blob.size === 0) {
+            lastError = new Error(`Empty response via ${endpoint.name}`);
+            logZip(`${label}: ${endpoint.name} → empty response, trying next source`);
+            onChunk(0, 0, 0);
+            continue;
+          }
+          onChunk(blob.size, blob.size, blob.size);
+          return blob;
         }
       } catch (e) {
-        if (signal.aborted) throw e;
+        if (signal.aborted || e.name === 'AbortError') throw e;
+        lastError = e;
+        logZip(`${label}: ${endpoint.name} → ${e.message || 'failed'}, trying next source`);
+        onChunk(0, 0, 0); // reset this file's progress before retrying with a new source
       }
     }
 
-    if (!response) throw new Error('Failed to download source link');
-
-    const contentLength = +(response.headers.get('Content-Length') || 0);
-
-    if (response.body && response.body.getReader) {
-      const reader = response.body.getReader();
-      let receivedLength = 0;
-      const chunks = [];
-
-      while (true) {
-        if (signal.aborted) {
-          reader.cancel();
-          throw new DOMException('Aborted', 'AbortError');
-        }
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        receivedLength += value.length;
-        onChunk(receivedLength, contentLength, value.length);
-      }
-      return new Blob(chunks);
-    } else {
-      const blob = await response.blob();
-      onChunk(blob.size, blob.size, blob.size);
-      return blob;
-    }
+    throw lastError || new Error('Failed to download source link');
   }
 
   btnCancelDownload.addEventListener('click', () => {
@@ -1167,6 +1208,8 @@
     const { signal } = currentAbortController;
 
     telemetryBox.classList.add('active');
+    zipLog.innerHTML = '';
+    zipLog.style.display = 'none';
     btnZipDownload.disabled = true;
     btnCancelDownload.style.display = 'inline-flex';
 
@@ -1175,6 +1218,7 @@
     const fileProgress = new Array(totalFiles).fill(0);
     const fileSizes = new Array(totalFiles).fill(0);
     let completedFiles = 0;
+    let failedFiles = 0;
 
     let lastBytesSample = 0;
     let lastTimeSample = Date.now();
@@ -1187,7 +1231,7 @@
       const elapsed = (now - lastTimeSample) / 1000;
       if (elapsed >= 0.5) {
         const bytesDiff = totalDownloaded - lastBytesSample;
-        const currentSpeed = bytesDiff / elapsed;
+        const currentSpeed = Math.max(0, bytesDiff / elapsed);
         statSpeed.textContent = `${formatBytes(currentSpeed)}/s`;
         lastBytesSample = totalDownloaded;
         lastTimeSample = now;
@@ -1212,13 +1256,25 @@
       zipStatus.textContent = `Streaming chunks...`;
     };
 
+    const usedNames = new Set();
     const sanitizeName = (url, idx) => {
+      let name;
       try {
-        const u = new URL(url).pathname;
-        const name = u.substring(u.lastIndexOf('/') + 1);
-        if (name && name.includes('.')) return name;
-      } catch (e) {}
-      return `File_${String(idx + 1).padStart(2, '0')}.mp4`;
+        const pathname = new URL(url).pathname;
+        const candidate = pathname.substring(pathname.lastIndexOf('/') + 1);
+        name = (candidate && candidate.includes('.')) ? candidate : `File_${String(idx + 1).padStart(2, '0')}.mp4`;
+      } catch (e) {
+        name = `File_${String(idx + 1).padStart(2, '0')}.mp4`;
+      }
+      // Avoid silently overwriting files that sanitize to the same name
+      if (usedNames.has(name)) {
+        const dot = name.lastIndexOf('.');
+        const base = dot > -1 ? name.slice(0, dot) : name;
+        const ext = dot > -1 ? name.slice(dot) : '';
+        name = `${base}_${idx + 1}${ext}`;
+      }
+      usedNames.add(name);
+      return name;
     };
 
     try {
@@ -1231,10 +1287,12 @@
             fileProgress[idx] = received;
             if (total) fileSizes[idx] = total;
             updateTelemetryUI();
-          });
+          }, fileName);
           zip.file(fileName, blob, { binary: true, compression: "STORE" });
         } catch (err) {
           if (err.name === 'AbortError') throw err;
+          failedFiles++;
+          logZip(`${fileName}: all sources failed (${err.message || 'unknown error'})`);
           zip.file(`${fileName}_ERROR.txt`, `Download Failed for ${url}\nError: ${err.message}`);
         } finally {
           completedFiles++;
@@ -1261,7 +1319,9 @@
       await saveArchiveToDB(outName, zipBlob, urls.length);
       await renderArchives();
 
-      zipStatus.textContent = 'Download Complete & Stored!';
+      zipStatus.textContent = failedFiles > 0
+        ? `Done — ${failedFiles} of ${totalFiles} file(s) failed (see log)`
+        : 'Download Complete & Stored!';
       statSpeed.textContent = '0 B/s';
       zipPct.textContent = '100%';
       zipBar.style.width = '100%';
@@ -1275,6 +1335,7 @@
         setTimeout(() => telemetryBox.classList.remove('active'), 2500);
       } else {
         zipStatus.textContent = 'Error: ' + err.message;
+        logZip(`Fatal: ${err.message}`);
       }
     } finally {
       btnZipDownload.disabled = false;
