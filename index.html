@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+)<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6,1154 +6,586 @@
 <meta name="theme-color" content="#0d0e14">
 <title>Fluxplay — Direct Media & Batch Downloader</title>
 
-<!-- JSZip & FileSaver -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-<!-- Google Material Symbols & Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0">
 
 <style>
-  :root {
-    --md-sys-color-background: #0d0e14;
-    --md-sys-color-surface: #151620;
-    --md-sys-color-surface-variant: #1e1f2d;
-    --md-sys-color-surface-container: #191a26;
-    --md-sys-color-primary: #a78bfa;
-    --md-sys-color-primary-dark: #6366f1;
-    --md-sys-color-on-primary: #1e1b4b;
-    --md-sys-color-accent: #f43f5e;
-    --md-sys-color-outline: rgba(255, 255, 255, 0.08);
-    --md-sys-color-text: #f3f4f6;
-    --md-sys-color-text-subtle: #9ca3af;
-    --md-sys-color-error: #fb7185;
-    --md-sys-color-success: #34d399;
-    --radius-sm: 10px;
-    --radius-md: 16px;
-    --radius-lg: 24px;
-    --radius-full: 9999px;
-  }
-
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; background-color: var(--md-sys-color-background); color: var(--md-sys-color-text); font-family: 'Plus Jakarta Sans', sans-serif; user-select: none; -webkit-user-select: none; overflow-x: hidden; }
-  body { display: flex; justify-content: center; }
-
-  .android-frame { width: 100%; max-width: 480px; height: 100%; display: flex; flex-direction: column; position: relative; background: var(--md-sys-color-background); }
-
-  /* Top App Bar */
-  .top-app-bar {
-    height: 58px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 18px;
-    padding-top: env(safe-area-inset-top);
-  }
-  .app-title {
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .app-title .logo-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-accent));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-  }
-  .app-title .logo-icon .material-symbols-rounded { font-size: 18px; }
-
-  .status-chip {
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 5px 12px;
-    border-radius: var(--radius-full);
-    background: var(--md-sys-color-surface-container);
-    color: var(--md-sys-color-text-subtle);
-    border: 1px solid var(--md-sys-color-outline);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .status-chip.live {
-    color: var(--md-sys-color-success);
-    border-color: rgba(52, 211, 153, 0.25);
-    background: rgba(52, 211, 153, 0.08);
-  }
-  .status-chip.live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--md-sys-color-success); box-shadow: 0 0 8px var(--md-sys-color-success); }
-  .status-chip.canceled {
-    color: var(--md-sys-color-error);
-    border-color: rgba(251, 113, 133, 0.25);
-    background: rgba(251, 113, 133, 0.08);
-  }
-
-  .content-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 6px 16px calc(80px + env(safe-area-inset-bottom)) 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  /* Player Card */
-  .player-card {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    background: #000;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    border: 1px solid var(--md-sys-color-outline);
-  }
-
-  .player-card.fakefs {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 999999 !important;
-    width: 100vw !important;
-    height: 100dvh !important;
-    border-radius: 0 !important;
-    border: none !important;
-    aspect-ratio: auto !important;
-  }
-
-  video { width: 100%; height: 100%; display: block; object-fit: contain; background: #000; }
-
-  .gesture-surface { position: absolute; inset: 0; z-index: 3; display: grid; grid-template-columns: 1fr 1fr; touch-action: manipulation; }
-  .touch-half { width: 100%; height: 100%; }
-
-  .player-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--md-sys-color-text-subtle); z-index: 2; }
-  .player-empty .material-symbols-rounded { font-size: 42px; color: var(--md-sys-color-primary); }
-  .player-card.has-src .player-empty { display: none; }
-
-  .spinner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); pointer-events: none; z-index: 5; }
-  .spinner.show { display: flex; }
-  .spinner-ring { width: 38px; height: 38px; border-radius: 50%; border: 3.5px solid rgba(255,255,255,0.15); border-top-color: var(--md-sys-color-primary); animation: spin 0.8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .err-banner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(13, 14, 20, 0.96); padding: 20px; text-align: center; font-size: 13px; color: var(--md-sys-color-error); z-index: 6; }
-  .err-banner.show { display: flex; }
-
-  .skip-feedback {
-    position: absolute; top: 0; bottom: 0; width: 40%;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 13px; z-index: 4; opacity: 0;
-    pointer-events: none; transition: opacity 0.2s;
-  }
-  .skip-feedback.left { left: 0; background: radial-gradient(circle at 30% 50%, rgba(167, 139, 250, 0.25), transparent 70%); }
-  .skip-feedback.right { right: 0; background: radial-gradient(circle at 70% 50%, rgba(167, 139, 250, 0.25), transparent 70%); }
-  .skip-feedback.show { opacity: 1; }
-  .skip-feedback .material-symbols-rounded { font-size: 32px; }
-
-  .player-ui {
-    position: absolute; inset: 0;
-    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.65) 100%);
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 12px; opacity: 1; transition: opacity 0.22s ease;
-    z-index: 7; pointer-events: auto;
-  }
-  .player-card.hide-ui .player-ui { opacity: 0; pointer-events: none; }
-
-  .center-controls {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex; align-items: center; gap: 18px;
-    z-index: 8;
-  }
-  .btn-circle {
-    width: 48px; height: 48px; border-radius: 50%;
-    background: rgba(30, 31, 45, 0.85); backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.1); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: transform 0.1s;
-  }
-  .btn-circle:active { transform: scale(0.9); }
-  .btn-circle.play-btn {
-    width: 56px; height: 56px;
-    background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-primary-dark));
-    color: white; border: none; box-shadow: 0 4px 16px rgba(167, 139, 250, 0.4);
-  }
-
-  .bottom-controls { display: flex; flex-direction: column; gap: 4px; }
-  .seek-slider-container { position: relative; height: 24px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
-  .seek-track { width: 100%; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.2); position: relative; }
-  .seek-buffer { position: absolute; height: 100%; left: 0; background: rgba(255,255,255,0.35); border-radius: 2px; }
-  .seek-fill { position: absolute; height: 100%; left: 0; background: var(--md-sys-color-primary); border-radius: 2px; }
-  .seek-thumb { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: #fff; transform: translateX(-50%); box-shadow: 0 0 8px rgba(0,0,0,0.8); pointer-events: none; }
-
-  .ctrl-bar { display: flex; align-items: center; justify-content: space-between; }
-  .ctrl-actions { display: flex; align-items: center; gap: 6px; }
-
-  .icon-action { background: none; border: none; color: #fff; cursor: pointer; padding: 6px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; }
-  .icon-action:active { background: rgba(255,255,255,0.15); }
-  .time-chip { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: #d1d5db; }
-
-  .md-select { background: rgba(255, 255, 255, 0.12); color: #fff; border: 1px solid var(--md-sys-color-outline); border-radius: var(--radius-sm); font-size: 11px; padding: 3px 8px; outline: none; }
-  .md-select option { background: var(--md-sys-color-surface); }
-
-  /* Cards & Paneling */
-  .md-card {
-    background: var(--md-sys-color-surface);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    border: 1px solid var(--md-sys-color-outline);
-  }
-
-  .card-label {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--md-sys-color-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  /* File Count Badge */
-  .count-pill {
-    background: var(--md-sys-color-surface-variant);
-    border: 1px solid var(--md-sys-color-outline);
-    color: var(--md-sys-color-text);
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-    font-size: 11px;
-    font-weight: 700;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  .md-input {
-    width: 100%;
-    background: var(--md-sys-color-surface-container);
-    border: 1px solid var(--md-sys-color-outline);
-    color: var(--md-sys-color-text);
-    padding: 12px 14px;
-    border-radius: var(--radius-md);
-    font-size: 13px;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .md-input:focus { border-color: var(--md-sys-color-primary); }
-  textarea.md-input { resize: vertical; min-height: 90px; line-height: 1.45; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-
-  .md-btn {
-    background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-primary-dark));
-    color: white;
-    border: none;
-    padding: 12px 18px;
-    border-radius: var(--radius-full);
-    font-weight: 700;
-    font-size: 13.5px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(167, 139, 250, 0.3);
-    transition: opacity 0.2s, transform 0.1s;
-  }
-  .md-btn:active { transform: scale(0.97); }
-  .md-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
-
-  .md-btn-cancel {
-    background: rgba(251, 113, 133, 0.15);
-    color: var(--md-sys-color-error);
-    border: 1px solid rgba(251, 113, 133, 0.3);
-    padding: 6px 12px;
-    border-radius: var(--radius-full);
-    font-weight: 700;
-    font-size: 11.5px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-  }
-  .md-btn-cancel:active { background: rgba(251, 113, 133, 0.25); }
-
-  .md-btn-danger {
-    background: rgba(251, 113, 133, 0.12);
-    color: var(--md-sys-color-error);
-    border: 1px solid rgba(251, 113, 133, 0.25);
-    padding: 10px 16px;
-    border-radius: var(--radius-md);
-    font-weight: 700;
-    font-size: 13px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    cursor: pointer;
-  }
-  .md-btn-danger:active { background: rgba(251, 113, 133, 0.25); }
-
-  /* Progress Telemetry Card */
-  .telemetry-card {
-    background: var(--md-sys-color-surface-container);
-    border: 1px solid var(--md-sys-color-outline);
-    border-radius: var(--radius-md);
-    padding: 14px;
-    display: none;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .telemetry-card.active { display: flex; }
-  .telemetry-header { display: flex; justify-content: space-between; align-items: flex-start; }
-  .telemetry-status { font-size: 13px; font-weight: 700; color: var(--md-sys-color-text); }
-  .telemetry-percentage { font-size: 18px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--md-sys-color-primary); }
-  .progress-track { height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: var(--radius-full); overflow: hidden; position: relative; }
-  .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-accent)); transition: width 0.15s ease; }
-  .telemetry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 4px; }
-  .stat-chip { background: var(--md-sys-color-surface-variant); padding: 8px 10px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 2px; }
-  .stat-chip .stat-label { font-size: 10px; font-weight: 600; color: var(--md-sys-color-text-subtle); text-transform: uppercase; }
-  .stat-chip .stat-value { font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--md-sys-color-text); }
-
-  /* Saved ZIP Archives Manager */
-  .saved-archives { display: flex; flex-direction: column; gap: 8px; }
-  .archive-item {
-    background: var(--md-sys-color-surface-container);
-    border-radius: var(--radius-md);
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border: 1px solid var(--md-sys-color-outline);
-  }
-  .archive-meta { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .archive-meta .zip-icon-bubble {
-    width: 36px; height: 36px; border-radius: var(--radius-sm);
-    background: rgba(167, 139, 250, 0.12); color: var(--md-sys-color-primary);
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
-  .archive-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
-  .archive-size { font-size: 11px; color: var(--md-sys-color-text-subtle); font-family: 'JetBrains Mono', monospace; }
-  .archive-actions { display: flex; align-items: center; gap: 4px; }
-
-  .icon-btn-sm {
-    background: none; border: none; color: var(--md-sys-color-text);
-    cursor: pointer; width: 34px; height: 34px; border-radius: var(--radius-full);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .icon-btn-sm:active { background: rgba(255,255,255,0.12); }
-  .icon-btn-sm.delete { color: var(--md-sys-color-error); }
-
-  /* Settings Page Styles */
-  .storage-indicator-box {
-    background: var(--md-sys-color-surface-container);
-    border-radius: var(--radius-md);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border: 1px solid var(--md-sys-color-outline);
-  }
-  .storage-meta-row { display: flex; justify-content: space-between; align-items: center; }
-  .storage-number { font-size: 20px; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--md-sys-color-primary); }
-
-  /* Bottom Navigation */
-  .bottom-nav {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    height: calc(62px + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
-    background: var(--md-sys-color-surface-container);
-    border-top: 1px solid var(--md-sys-color-outline);
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    z-index: 10;
-  }
-  .nav-item {
-    background: none; border: none; color: var(--md-sys-color-text-subtle);
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
-    cursor: pointer; font-size: 11px; font-weight: 600; padding: 6px 16px;
-    border-radius: var(--radius-full); transition: all 0.2s;
-  }
-  .nav-item .material-symbols-rounded { font-size: 22px; padding: 2px 14px; border-radius: var(--radius-full); }
-  .nav-item.active { color: var(--md-sys-color-text); }
-  .nav-item.active .material-symbols-rounded {
-    background: rgba(167, 139, 250, 0.18);
-    color: var(--md-sys-color-primary);
-  }
+:root{
+--bg:#0d0e14;--surface:#151620;--variant:#1e1f2d;--container:#191a26;
+--primary:#a78bfa;--primary2:#6366f1;--accent:#f43f5e;
+--text:#f3f4f6;--subtle:#9ca3af;--error:#fb7185;--success:#34d399;
+--outline:rgba(255,255,255,.08);--rsm:10px;--rmd:16px;--rlg:24px;--full:9999px
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;overflow-x:hidden}
+body{display:flex;justify-content:center}
+button,input,textarea,select{font:inherit}
+.android-frame{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;position:relative;background:var(--bg)}
+.top-app-bar{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;padding-top:env(safe-area-inset-top)}
+.app-title{font-size:20px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.logo-icon{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff}
+.logo-icon .material-symbols-rounded{font-size:18px}
+.status-chip{font-size:11.5px;font-weight:600;padding:5px 12px;border-radius:var(--full);background:var(--container);color:var(--subtle);border:1px solid var(--outline);display:inline-flex;align-items:center;gap:6px}
+.status-chip.live{color:var(--success);border-color:rgba(52,211,153,.25);background:rgba(52,211,153,.08)}
+.status-chip.live:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 8px var(--success)}
+.status-chip.canceled{color:var(--error);border-color:rgba(251,113,133,.25);background:rgba(251,113,133,.08)}
+.content-scroll{flex:1;overflow-y:auto;padding:6px 16px calc(80px + env(safe-area-inset-bottom)) 16px;display:flex;flex-direction:column;gap:14px}
+.player-card{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--rlg);overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.6);border:1px solid var(--outline)}
+.player-card.fakefs{position:fixed!important;inset:0!important;z-index:999999!important;width:100vw!important;height:100dvh!important;border-radius:0!important;border:none!important;aspect-ratio:auto!important}
+video{width:100%;height:100%;display:block;object-fit:contain;background:#000}
+.gesture-surface{position:absolute;inset:0;z-index:3;display:grid;grid-template-columns:1fr 1fr;touch-action:manipulation}
+.touch-half{width:100%;height:100%}
+.player-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--subtle);z-index:2}
+.player-empty .material-symbols-rounded{font-size:42px;color:var(--primary)}
+.player-card.has-src .player-empty{display:none}
+.spinner{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);pointer-events:none;z-index:5}
+.spinner.show{display:flex}
+.spinner-ring{width:38px;height:38px;border-radius:50%;border:3.5px solid rgba(255,255,255,.15);border-top-color:var(--primary);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-banner{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(13,14,20,.96);padding:20px;text-align:center;font-size:13px;color:var(--error);z-index:6}
+.err-banner.show{display:flex}
+.skip-feedback{position:absolute;top:0;bottom:0;width:40%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;z-index:4;opacity:0;pointer-events:none;transition:opacity .15s}
+.skip-feedback.left{left:0;background:radial-gradient(circle at 30% 50%,rgba(167,139,250,.25),transparent 70%)}
+.skip-feedback.right{right:0;background:radial-gradient(circle at 70% 50%,rgba(167,139,250,.25),transparent 70%)}
+.skip-feedback.show{opacity:1}
+.skip-feedback .material-symbols-rounded{font-size:32px}
+.player-ui{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.9) 0%,rgba(0,0,0,.25) 50%,rgba(0,0,0,.65) 100%);display:flex;flex-direction:column;justify-content:space-between;padding:12px;opacity:1;transition:opacity .22s ease;z-index:7;pointer-events:auto}
+.player-card.hide-ui .player-ui{opacity:0;pointer-events:none}
+.center-controls{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:18px;z-index:8}
+.btn-circle{width:48px;height:48px;border-radius:50%;background:rgba(30,31,45,.85);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.btn-circle:active{transform:scale(.9)}
+.btn-circle.play-btn{width:56px;height:56px;background:linear-gradient(135deg,var(--primary),var(--primary2));border:none;box-shadow:0 4px 16px rgba(167,139,250,.4)}
+.bottom-controls{display:flex;flex-direction:column;gap:4px}
+.seek-slider-container{position:relative;height:24px;display:flex;align-items:center;cursor:pointer;touch-action:none}
+.seek-track{width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.2);position:relative}
+.seek-buffer,.seek-fill{position:absolute;height:100%;left:0;border-radius:2px}
+.seek-buffer{background:rgba(255,255,255,.35)}
+.seek-fill{background:var(--primary)}
+.seek-thumb{position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;transform:translateX(-50%);box-shadow:0 0 8px rgba(0,0,0,.8);pointer-events:none}
+.ctrl-bar{display:flex;align-items:center;justify-content:space-between}
+.ctrl-actions{display:flex;align-items:center;gap:6px}
+.icon-action{background:none;border:none;color:#fff;cursor:pointer;padding:6px;border-radius:var(--full);display:flex;align-items:center;justify-content:center}
+.time-chip{font-size:11px;font-family:'JetBrains Mono',monospace;color:#d1d5db}
+.md-select{background:rgba(255,255,255,.12);color:#fff;border:1px solid var(--outline);border-radius:var(--rsm);font-size:11px;padding:3px 8px;outline:none}
+.md-select option{background:var(--surface)}
+.md-card{background:var(--surface);border-radius:var(--rlg);padding:16px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--outline)}
+.card-label{font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between}
+.count-pill{background:var(--variant);border:1px solid var(--outline);color:var(--text);padding:3px 10px;border-radius:var(--full);font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.md-input{width:100%;background:var(--container);border:1px solid var(--outline);color:var(--text);padding:12px 14px;border-radius:var(--rmd);font-size:13px;outline:none;transition:border-color .2s}
+.md-input:focus{border-color:var(--primary)}
+textarea.md-input{resize:vertical;min-height:90px;line-height:1.45;font-family:'JetBrains Mono',monospace;font-size:12px;user-select:text;-webkit-user-select:text}
+.md-btn{background:linear-gradient(135deg,var(--primary),var(--primary2));color:#fff;border:none;padding:12px 18px;border-radius:var(--full);font-weight:700;font-size:13.5px;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 4px 14px rgba(167,139,250,.3)}
+.md-btn:active{transform:scale(.97)}
+.md-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+.md-btn-cancel{background:rgba(251,113,133,.15);color:var(--error);border:1px solid rgba(251,113,133,.3);padding:6px 12px;border-radius:var(--full);font-weight:700;font-size:11.5px;display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.md-btn-danger{background:rgba(251,113,133,.12);color:var(--error);border:1px solid rgba(251,113,133,.25);padding:10px 16px;border-radius:var(--rmd);font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.telemetry-card{background:var(--container);border:1px solid var(--outline);border-radius:var(--rmd);padding:14px;display:none;flex-direction:column;gap:10px}
+.telemetry-card.active{display:flex}
+.telemetry-header{display:flex;justify-content:space-between;align-items:flex-start}
+.telemetry-status{font-size:13px;font-weight:700}
+.telemetry-percentage{font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.progress-track{height:8px;background:rgba(255,255,255,.08);border-radius:var(--full);overflow:hidden;position:relative}
+.progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .15s ease}
+.telemetry-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:4px}
+.stat-chip{background:var(--variant);padding:8px 10px;border-radius:var(--rsm);display:flex;flex-direction:column;gap:2px}
+.stat-label{font-size:10px;font-weight:600;color:var(--subtle);text-transform:uppercase}
+.stat-value{font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.saved-archives{display:flex;flex-direction:column;gap:8px}
+.archive-item{background:var(--container);border-radius:var(--rmd);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border:1px solid var(--outline)}
+.archive-meta{display:flex;align-items:center;gap:12px;min-width:0}
+.zip-icon-bubble{width:36px;height:36px;border-radius:var(--rsm);background:rgba(167,139,250,.12);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.archive-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+.archive-size{font-size:11px;color:var(--subtle);font-family:'JetBrains Mono',monospace}
+.archive-actions{display:flex;align-items:center;gap:4px}
+.icon-btn-sm{background:none;border:none;color:var(--text);cursor:pointer;width:34px;height:34px;border-radius:var(--full);display:flex;align-items:center;justify-content:center}
+.icon-btn-sm.delete{color:var(--error)}
+.storage-indicator-box{background:var(--container);border-radius:var(--rmd);padding:16px;display:flex;flex-direction:column;gap:10px;border:1px solid var(--outline)}
+.storage-meta-row{display:flex;justify-content:space-between;align-items:center}
+.storage-number{font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.bottom-nav{position:absolute;bottom:0;left:0;right:0;height:calc(62px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--container);border-top:1px solid var(--outline);display:flex;justify-content:space-around;align-items:center;z-index:10}
+.nav-item{background:none;border:none;color:var(--subtle);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font-size:11px;font-weight:600;padding:6px 16px;border-radius:var(--full)}
+.nav-item .material-symbols-rounded{font-size:22px;padding:2px 14px;border-radius:var(--full)}
+.nav-item.active{color:var(--text)}
+.nav-item.active .material-symbols-rounded{background:rgba(167,139,250,.18);color:var(--primary)}
+.direct-fallback{display:none;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);padding:12px;border-radius:var(--rmd);gap:8px;flex-direction:column}
+.direct-fallback.show{display:flex}
+.direct-fallback small{color:var(--subtle);line-height:1.4}
 </style>
 </head>
 <body>
-
 <div class="android-frame">
-  <div class="top-app-bar">
-    <div class="app-title">
-      <div class="logo-icon"><span class="material-symbols-rounded">play_arrow</span></div>
-      Fluxplay
-    </div>
-    <span class="status-chip" id="statusChip">Ready</span>
-  </div>
+<div class="top-app-bar">
+<div class="app-title"><div class="logo-icon"><span class="material-symbols-rounded">play_arrow</span></div>Fluxplay</div>
+<span class="status-chip" id="statusChip">Ready</span>
+</div>
 
-  <div class="content-scroll">
-    <!-- Video Player Card -->
-    <div class="player-card" id="playerCard">
-      <video id="video" playsinline webkit-playsinline preload="metadata"></video>
+<div class="content-scroll">
+<div class="player-card" id="playerCard">
+<video id="video" playsinline webkit-playsinline preload="metadata"></video>
+<div class="gesture-surface">
+<div class="touch-half" id="touchLeft"></div>
+<div class="touch-half" id="touchRight"></div>
+</div>
+<div class="player-empty"><span class="material-symbols-rounded">movie</span><span style="font-size:13px;font-weight:500">Load a video link below</span></div>
+<div class="spinner" id="spinner"><div class="spinner-ring"></div></div>
+<div class="err-banner" id="errBanner">Unable to load video. Check the link or CORS policy.</div>
+<div class="skip-feedback left" id="animSkipLeft"><span class="material-symbols-rounded">replay_10</span><span>-10s</span></div>
+<div class="skip-feedback right" id="animSkipRight"><span class="material-symbols-rounded">forward_10</span><span>+10s</span></div>
 
-      <div class="gesture-surface" id="gestureSurface">
-        <div class="touch-half" id="touchLeft"></div>
-        <div class="touch-half" id="touchRight"></div>
-      </div>
+<div class="player-ui" id="playerUi">
+<div style="display:flex;justify-content:flex-end">
+<select class="md-select" id="speedSelect">
+<option value=".75">0.75x</option><option value="1" selected>1.0x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2.0x</option>
+</select>
+</div>
+<div class="center-controls">
+<button class="btn-circle" id="btnBack10"><span class="material-symbols-rounded">replay_10</span></button>
+<button class="btn-circle play-btn" id="btnPlayCenter"><span class="material-symbols-rounded" id="playIcon">play_arrow</span></button>
+<button class="btn-circle" id="btnFwd10"><span class="material-symbols-rounded">forward_10</span></button>
+</div>
+<div class="bottom-controls">
+<div class="seek-slider-container" id="seekWrap"><div class="seek-track"><div class="seek-buffer" id="seekBuffer"></div><div class="seek-fill" id="seekFill"></div></div><div class="seek-thumb" id="seekThumb"></div></div>
+<div class="ctrl-bar"><span class="time-chip" id="timeLabel">0:00 / 0:00</span><div class="ctrl-actions">
+<button class="icon-action" id="btnMute"><span class="material-symbols-rounded" id="muteIcon">volume_up</span></button>
+<button class="icon-action" id="btnFs"><span class="material-symbols-rounded" id="fsIcon">fullscreen</span></button>
+</div></div>
+</div>
+</div>
+</div>
 
-      <div class="player-empty">
-        <span class="material-symbols-rounded">movie</span>
-        <span style="font-size: 13px; font-weight: 500;">Load a video link below</span>
-      </div>
+<div class="md-card" id="streamPanel">
+<span class="card-label">Instant Video Stream</span>
+<input class="md-input" id="streamUrl" type="text" placeholder="https://example.com/video.mp4" inputmode="url" autocomplete="off">
+<button class="md-btn" id="btnStream"><span class="material-symbols-rounded">play_arrow</span>Play Stream</button>
+</div>
 
-      <div class="spinner" id="spinner"><div class="spinner-ring"></div></div>
-      <div class="err-banner" id="errBanner">Unable to load video. Check the link or CORS policy.</div>
+<div class="md-card" id="zipPanel" style="display:none">
+<div class="card-label"><span>Batch Files Input</span><span class="count-pill" id="fileCountBadge">0 Files Available</span></div>
+<textarea class="md-input" id="zipUrls" placeholder="Paste file links (one per line):&#10;https://example.com/file01.mp4&#10;https://example.com/file02.mp4" autocomplete="off"></textarea>
+<div style="display:flex;gap:8px">
+<input class="md-input" id="zipName" type="text" placeholder="Archive_Name" value="Files_Batch">
+<button class="md-btn" id="btnZipDownload"><span class="material-symbols-rounded">folder_zip</span>Download ZIP</button>
+</div>
 
-      <div class="skip-feedback left" id="animSkipLeft">
-        <span class="material-symbols-rounded">replay_10</span>
-        <span>-10s</span>
-      </div>
-      <div class="skip-feedback right" id="animSkipRight">
-        <span class="material-symbols-rounded">forward_10</span>
-        <span>+10s</span>
-      </div>
+<div class="direct-fallback" id="directFallback">
+<strong>Browser download available</strong>
+<small>JavaScript cannot read this server response in this browser, so a ZIP cannot be created here. You can download the original file directly instead.</small>
+<button class="md-btn" id="btnDirectDownload"><span class="material-symbols-rounded">download</span>Direct Download</button>
+</div>
 
-      <!-- Player Overlay UI -->
-      <div class="player-ui" id="playerUi">
-        <div style="display:flex; justify-content:flex-end;">
-          <select class="md-select" id="speedSelect">
-            <option value="0.75">0.75x</option>
-            <option value="1" selected>1.0x</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2">2.0x</option>
-          </select>
-        </div>
+<div class="telemetry-card" id="telemetryBox">
+<div class="telemetry-header">
+<div><div class="telemetry-status" id="zipStatus">Connecting...</div><div style="font-size:11px;color:var(--subtle)" id="zipFileProgressText">File 0 of 0</div></div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><div class="telemetry-percentage" id="zipPct">0%</div><button class="md-btn-cancel" id="btnCancelDownload"><span class="material-symbols-rounded" style="font-size:14px">close</span>Cancel</button></div>
+</div>
+<div class="progress-track"><div class="progress-fill" id="zipBar"></div></div>
+<div class="telemetry-grid">
+<div class="stat-chip"><span class="stat-label">Downloaded / Size</span><span class="stat-value" id="statSize">0 B / 0 B</span></div>
+<div class="stat-chip"><span class="stat-label">Live Speed</span><span class="stat-value" id="statSpeed">0 B/s</span></div>
+</div>
+</div>
 
-        <div class="center-controls">
-          <button class="btn-circle" id="btnBack10" title="Skip -10s">
-            <span class="material-symbols-rounded">replay_10</span>
-          </button>
-          <button class="btn-circle play-btn" id="btnPlayCenter" title="Play/Pause">
-            <span class="material-symbols-rounded" id="playIcon">play_arrow</span>
-          </button>
-          <button class="btn-circle" id="btnFwd10" title="Skip +10s">
-            <span class="material-symbols-rounded">forward_10</span>
-          </button>
-        </div>
+<div id="archivesSection" style="display:none;flex-direction:column;gap:8px;margin-top:6px">
+<span class="card-label" style="font-size:11px">Saved on Disk (IndexedDB)</span>
+<div class="saved-archives" id="archivesList"></div>
+</div>
+</div>
 
-        <div class="bottom-controls">
-          <div class="seek-slider-container" id="seekWrap">
-            <div class="seek-track">
-              <div class="seek-buffer" id="seekBuffer" style="width:0%"></div>
-              <div class="seek-fill" id="seekFill" style="width:0%"></div>
-            </div>
-            <div class="seek-thumb" id="seekThumb" style="left:0%"></div>
-          </div>
+<div class="md-card" id="settingsPanel" style="display:none">
+<span class="card-label">App Storage & Cache</span>
+<div class="storage-indicator-box">
+<div class="storage-meta-row"><span style="font-size:13px;font-weight:600">IndexedDB Storage Usage</span><span class="storage-number" id="storageUsageLabel">0 MB</span></div>
+<div class="progress-track"><div class="progress-fill" id="storageBarFill"></div></div>
+<span style="font-size:11px;color:var(--subtle)">Saved ZIP archives are stored in browser persistent storage.</span>
+</div>
+<button class="md-btn-danger" id="btnClearAllStorage"><span class="material-symbols-rounded">delete_sweep</span>Clear All Downloaded Data</button>
+</div>
+</div>
 
-          <div class="ctrl-bar">
-            <span class="time-chip" id="timeLabel">0:00 / 0:00</span>
-            <div class="ctrl-actions">
-              <button class="icon-action" id="btnMute">
-                <span class="material-symbols-rounded" id="muteIcon">volume_up</span>
-              </button>
-              <button class="icon-action" id="btnFs">
-                <span class="material-symbols-rounded" id="fsIcon">fullscreen</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- View 1: Stream Tab -->
-    <div class="md-card" id="streamPanel">
-      <span class="card-label">Instant Video Stream</span>
-      <input class="md-input" id="streamUrl" type="text" placeholder="https://example.com/video.mp4" inputmode="url">
-      <button class="md-btn" id="btnStream">
-        <span class="material-symbols-rounded">play_arrow</span>
-        Play Stream
-      </button>
-    </div>
-
-    <!-- View 2: Downloader Tab -->
-    <div class="md-card" id="zipPanel" style="display: none;">
-      <div class="card-label">
-        <span>Batch Files Input</span>
-        <span class="count-pill" id="fileCountBadge">0 Files Available</span>
-      </div>
-
-      <textarea class="md-input" id="zipUrls" placeholder="Paste file links (one per line):&#10;https://example.com/file01.mp4&#10;https://example.com/file02.mp4"></textarea>
-      
-      <div style="display:flex; gap:8px;">
-        <input class="md-input" id="zipName" type="text" placeholder="Archive_Name" value="Files_Batch">
-        <button class="md-btn" id="btnZipDownload">
-          <span class="material-symbols-rounded">folder_zip</span>
-          Download .ZIP
-        </button>
-      </div>
-
-      <!-- Real-Time Telemetry Progress Card -->
-      <div class="telemetry-card" id="telemetryBox">
-        <div class="telemetry-header">
-          <div>
-            <div class="telemetry-status" id="zipStatus">Connecting...</div>
-            <div style="font-size:11px; color:var(--md-sys-color-text-subtle);" id="zipFileProgressText">File 0 of 0</div>
-          </div>
-          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-            <div class="telemetry-percentage" id="zipPct">0%</div>
-            <button class="md-btn-cancel" id="btnCancelDownload">
-              <span class="material-symbols-rounded" style="font-size:14px;">close</span>
-              Cancel
-            </button>
-          </div>
-        </div>
-
-        <div class="progress-track"><div class="progress-fill" id="zipBar"></div></div>
-
-        <div class="telemetry-grid">
-          <div class="stat-chip">
-            <span class="stat-label">Total Downloaded / Size</span>
-            <span class="stat-value" id="statSize">0 MB / 0 MB</span>
-          </div>
-          <div class="stat-chip">
-            <span class="stat-label">Live Speed</span>
-            <span class="stat-value" id="statSpeed">0 MB/s</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Persistent Storage Pool -->
-      <div id="archivesSection" style="display:none; flex-direction:column; gap:8px; margin-top:6px;">
-        <span class="card-label" style="font-size:11px;">Saved on Disk (IndexedDB)</span>
-        <div class="saved-archives" id="archivesList"></div>
-      </div>
-    </div>
-
-    <!-- View 3: Settings & Storage Tab -->
-    <div class="md-card" id="settingsPanel" style="display: none;">
-      <span class="card-label">App Storage & Cache</span>
-
-      <div class="storage-indicator-box">
-        <div class="storage-meta-row">
-          <span style="font-size:13px; font-weight:600;">IndexedDB Storage Usage</span>
-          <span class="storage-number" id="storageUsageLabel">0 MB</span>
-        </div>
-        <div class="progress-track">
-          <div class="progress-fill" id="storageBarFill" style="width: 10%;"></div>
-        </div>
-        <span style="font-size:11px; color:var(--md-sys-color-text-subtle);">
-          Downloaded files are stored in offline persistent storage so closing the app does not lose them.
-        </span>
-      </div>
-
-      <button class="md-btn-danger" id="btnClearAllStorage">
-        <span class="material-symbols-rounded">delete_sweep</span>
-        Clear All Downloaded Data
-      </button>
-    </div>
-  </div>
-
-  <!-- Bottom Navigation -->
-  <div class="bottom-nav">
-    <button class="nav-item active" id="navStream">
-      <span class="material-symbols-rounded">play_circle</span>
-      Player
-    </button>
-    <button class="nav-item" id="navZip">
-      <span class="material-symbols-rounded">download_for_offline</span>
-      Downloader
-    </button>
-    <button class="nav-item" id="navSettings">
-      <span class="material-symbols-rounded">settings</span>
-      Settings
-    </button>
-  </div>
+<div class="bottom-nav">
+<button class="nav-item active" id="navStream"><span class="material-symbols-rounded">play_circle</span>Player</button>
+<button class="nav-item" id="navZip"><span class="material-symbols-rounded">download_for_offline</span>Downloader</button>
+<button class="nav-item" id="navSettings"><span class="material-symbols-rounded">settings</span>Settings</button>
+</div>
 </div>
 
 <script>
-(function () {
-  const $ = (id) => document.getElementById(id);
-  const video = $('video');
-  const playerCard = $('playerCard');
-  const statusChip = $('statusChip');
-  const spinner = $('spinner');
-  const errBanner = $('errBanner');
-  
-  const streamUrl = $('streamUrl');
-  const btnStream = $('btnStream');
-  const btnPlayCenter = $('btnPlayCenter');
-  const playIcon = $('playIcon');
-  const btnBack10 = $('btnBack10');
-  const btnFwd10 = $('btnFwd10');
-  
-  const btnMute = $('btnMute');
-  const muteIcon = $('muteIcon');
-  const btnFs = $('btnFs');
-  const fsIcon = $('fsIcon');
-  const speedSelect = $('speedSelect');
-  const timeLabel = $('timeLabel');
-
-  const seekWrap = $('seekWrap');
-  const seekFill = $('seekFill');
-  const seekBuffer = $('seekBuffer');
-  const seekThumb = $('seekThumb');
-
-  const animSkipLeft = $('animSkipLeft');
-  const animSkipRight = $('animSkipRight');
-
-  const navStream = $('navStream');
-  const navZip = $('navZip');
-  const navSettings = $('navSettings');
-
-  const streamPanel = $('streamPanel');
-  const zipPanel = $('zipPanel');
-  const settingsPanel = $('settingsPanel');
-
-  const zipUrls = $('zipUrls');
-  const fileCountBadge = $('fileCountBadge');
-  const zipName = $('zipName');
-  const btnZipDownload = $('btnZipDownload');
-  const btnCancelDownload = $('btnCancelDownload');
-  const telemetryBox = $('telemetryBox');
-  const zipStatus = $('zipStatus');
-  const zipFileProgressText = $('zipFileProgressText');
-  const zipPct = $('zipPct');
-  const zipBar = $('zipBar');
-  const statSize = $('statSize');
-  const statSpeed = $('statSpeed');
-  const archivesSection = $('archivesSection');
-  const archivesList = $('archivesList');
-
-  const storageUsageLabel = $('storageUsageLabel');
-  const storageBarFill = $('storageBarFill');
-  const btnClearAllStorage = $('btnClearAllStorage');
-
-  let uiTimer = null;
-  let isScrubbing = false;
-  let wasPlaying = false;
-  let currentAbortController = null;
-
-  // Simple File Counter
-  zipUrls.addEventListener('input', () => {
-    const lines = zipUrls.value.split('\n').map(u => u.trim()).filter(u => u.length > 0);
-    const count = lines.length;
-    fileCountBadge.textContent = `${count} ${count === 1 ? 'File Available' : 'Files Available'}`;
-  });
-
-  // =========================================================================
-  // PERSISTENT INDEXEDDB ENGINE
-  // =========================================================================
-  const DB_NAME = "FluxplayStorageDB";
-  const DB_VERSION = 1;
-  const STORE_NAME = "archives";
-  let dbInstance = null;
-
-  function openDatabase() {
-    return new Promise((resolve, reject) => {
-      if (dbInstance) return resolve(dbInstance);
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
-        }
-      };
-      req.onsuccess = (e) => {
-        dbInstance = e.target.result;
-        resolve(dbInstance);
-      };
-      req.onerror = (e) => reject(e);
-    });
-  }
-
-  async function saveArchiveToDB(name, blob, count) {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const record = { name, blob, count, createdAt: Date.now(), size: blob.size };
-      const req = store.add(record);
-      req.onsuccess = () => resolve();
-      req.onerror = (e) => reject(e);
-    });
-  }
-
-  async function getAllArchivesFromDB() {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readonly");
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.getAll();
-      req.onsuccess = (e) => resolve(e.target.result || []);
-      req.onerror = (e) => reject(e);
-    });
-  }
-
-  async function deleteArchiveFromDB(id) {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = (e) => reject(e);
-    });
-  }
-
-  async function clearAllFromDB() {
-    const db = await openDatabase();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.clear();
-      req.onsuccess = () => resolve();
-      req.onerror = (e) => reject(e);
-    });
-  }
-
-  async function refreshStorageTelemetry() {
-    if (navigator.storage && navigator.storage.estimate) {
-      const { usage } = await navigator.storage.estimate();
-      storageUsageLabel.textContent = formatBytes(usage);
-      const pct = Math.min(100, Math.max(5, Math.round((usage / (1024 * 1024 * 1024)) * 100)));
-      storageBarFill.style.width = `${pct}%`;
-    } else {
-      const archives = await getAllArchivesFromDB();
-      const total = archives.reduce((a, b) => a + (b.size || 0), 0);
-      storageUsageLabel.textContent = formatBytes(total);
-    }
-  }
-
-  async function renderArchives() {
-    const archives = await getAllArchivesFromDB();
-    if (archives.length === 0) {
-      archivesSection.style.display = 'none';
-      archivesList.innerHTML = '';
-      refreshStorageTelemetry();
-      return;
-    }
-    archivesSection.style.display = 'flex';
-    archivesList.innerHTML = '';
-
-    archives.reverse().forEach((arch) => {
-      const item = document.createElement('div');
-      item.className = 'archive-item';
-      item.innerHTML = `
-        <div class="archive-meta">
-          <div class="zip-icon-bubble">
-            <span class="material-symbols-rounded">folder_zip</span>
-          </div>
-          <div>
-            <div class="archive-name">${arch.name}</div>
-            <div class="archive-size">${formatBytes(arch.size)} • ${arch.count} files</div>
-          </div>
-        </div>
-        <div class="archive-actions">
-          <button class="icon-btn-sm" title="Re-download" onclick="window._reDownloadZip(${arch.id})">
-            <span class="material-symbols-rounded">download</span>
-          </button>
-          <button class="icon-btn-sm delete" title="Delete" onclick="window._deleteZip(${arch.id})">
-            <span class="material-symbols-rounded">delete</span>
-          </button>
-        </div>
-      `;
-      archivesList.appendChild(item);
-    });
-    refreshStorageTelemetry();
-  }
-
-  window._reDownloadZip = async function (id) {
-    const archives = await getAllArchivesFromDB();
-    const item = archives.find(a => a.id === id);
-    if (item && item.blob) saveAs(item.blob, item.name);
-  };
-
-  window._deleteZip = async function (id) {
-    await deleteArchiveFromDB(id);
-    renderArchives();
-  };
-
-  btnClearAllStorage.addEventListener('click', async () => {
-    if (confirm("Clear all downloaded archives and free device storage?")) {
-      await clearAllFromDB();
-      renderArchives();
-    }
-  });
-
-  // Tabs Switching
-  function switchTab(activeBtn, activePanel) {
-    [navStream, navZip, navSettings].forEach(btn => btn.classList.remove('active'));
-    [streamPanel, zipPanel, settingsPanel].forEach(panel => panel.style.display = 'none');
-    activeBtn.classList.add('active');
-    activePanel.style.display = 'flex';
-    if (activePanel === settingsPanel) refreshStorageTelemetry();
-  }
-
-  navStream.addEventListener('click', () => switchTab(navStream, streamPanel));
-  navZip.addEventListener('click', () => switchTab(navZip, zipPanel));
-  navSettings.addEventListener('click', () => switchTab(navSettings, settingsPanel));
-
-  function setStatus(text, type = 'default') {
-    statusChip.textContent = text;
-    statusChip.className = 'status-chip' + (type === 'live' ? ' live' : type === 'canceled' ? ' canceled' : '');
-  }
-
-  function fmtTime(sec) {
-    if (!isFinite(sec) || sec < 0) return "0:00";
-    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
-    return `${m}:${String(s).padStart(2, '0')}`;
-  }
-
-  function formatBytes(bytes) {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }
-
-  function showUI() {
-    playerCard.classList.remove('hide-ui');
-    clearTimeout(uiTimer);
-    uiTimer = setTimeout(() => {
-      if (!video.paused && !isScrubbing) playerCard.classList.add('hide-ui');
-    }, 3000);
-  }
-
-  function playSource(url) {
-    if (!url) return;
-    errBanner.classList.remove('show');
-    playerCard.classList.add('has-src');
-    spinner.classList.add('show');
-    setStatus('Loading…');
-    video.src = url;
-    video.load();
-    video.play().then(() => setStatus('Playing', 'live')).catch(() => {});
-  }
-
-  btnStream.addEventListener('click', () => {
-    const url = streamUrl.value.trim();
-    if (url) playSource(url);
-  });
-  streamUrl.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnStream.click(); });
-
-  function togglePlay() {
-    if (!video.src) return;
-    if (video.paused) video.play().catch(() => {});
-    else video.pause();
-    showUI();
-  }
-
-  function doSkip(seconds) {
-    if (!video.src || !isFinite(video.duration)) return;
-    video.currentTime = Math.min(Math.max(0, video.currentTime + seconds), video.duration);
-    updateSeekUI();
-    showUI();
-  }
-
-  btnPlayCenter.addEventListener('click', togglePlay);
-  btnBack10.addEventListener('click', () => {
-    doSkip(-10);
-    animSkipLeft.classList.add('show');
-    setTimeout(() => animSkipLeft.classList.remove('show'), 350);
-  });
-  btnFwd10.addEventListener('click', () => {
-    doSkip(10);
-    animSkipRight.classList.add('show');
-    setTimeout(() => animSkipRight.classList.remove('show'), 350);
-  });
-
-  let lastTapTime = 0;
-  let tapTimer = null;
-  function handleTouchZone(side) {
-    const now = Date.now();
-    if (now - lastTapTime < 300) {
-      clearTimeout(tapTimer);
-      if (side === 'left') { doSkip(-10); animSkipLeft.classList.add('show'); setTimeout(() => animSkipLeft.classList.remove('show'), 350); }
-      else { doSkip(10); animSkipRight.classList.add('show'); setTimeout(() => animSkipRight.classList.remove('show'), 350); }
-    } else {
-      tapTimer = setTimeout(() => {
-        if (playerCard.classList.contains('hide-ui')) showUI();
-        else playerCard.classList.add('hide-ui');
-      }, 280);
-    }
-    lastTapTime = now;
-  }
-
-  $('touchLeft').addEventListener('pointerdown', (e) => { e.preventDefault(); handleTouchZone('left'); });
-  $('touchRight').addEventListener('pointerdown', (e) => { e.preventDefault(); handleTouchZone('right'); });
-
-  function updateSeekUI() {
-    const d = video.duration;
-    if (d && isFinite(d)) {
-      const pct = (video.currentTime / d) * 100;
-      seekFill.style.width = pct + '%';
-      seekThumb.style.left = pct + '%';
-      timeLabel.textContent = `${fmtTime(video.currentTime)} / ${fmtTime(d)}`;
-      if (video.buffered.length) {
-        const buf = video.buffered.end(video.buffered.length - 1);
-        seekBuffer.style.width = (buf / d * 100) + '%';
-      }
-    }
-  }
-
-  function seekTo(clientX) {
-    const rect = seekWrap.getBoundingClientRect();
-    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    if (isFinite(video.duration)) {
-      video.currentTime = pct * video.duration;
-      updateSeekUI();
-    }
-  }
-
-  seekWrap.addEventListener('pointerdown', (e) => {
-    isScrubbing = true;
-    wasPlaying = !video.paused;
-    video.pause();
-    seekTo(e.clientX);
-    showUI();
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-  });
-  function onMove(e) { if (isScrubbing) seekTo(e.clientX); }
-  function onUp() {
-    if (isScrubbing) {
-      isScrubbing = false;
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      if (wasPlaying) video.play().catch(() => {});
-      showUI();
-    }
-  }
-
-  btnMute.addEventListener('click', () => {
-    video.muted = !video.muted;
-    muteIcon.textContent = video.muted ? 'volume_off' : 'volume_up';
-    showUI();
-  });
-
-  speedSelect.addEventListener('change', () => video.playbackRate = parseFloat(speedSelect.value));
-
-  btnFs.addEventListener('click', () => {
-    if (playerCard.classList.contains('fakefs')) {
-      playerCard.classList.remove('fakefs');
-      fsIcon.textContent = 'fullscreen';
-    } else {
-      playerCard.classList.add('fakefs');
-      fsIcon.textContent = 'fullscreen_exit';
-    }
-  });
-
-  video.addEventListener('play', () => { playIcon.textContent = 'pause'; setStatus('Playing', 'live'); showUI(); });
-  video.addEventListener('pause', () => { playIcon.textContent = 'play_arrow'; setStatus('Paused'); showUI(); });
-  video.addEventListener('timeupdate', updateSeekUI);
-  video.addEventListener('loadedmetadata', () => { updateSeekUI(); spinner.classList.remove('show'); });
-  video.addEventListener('waiting', () => spinner.classList.add('show'));
-  video.addEventListener('playing', () => spinner.classList.remove('show'));
-  video.addEventListener('error', () => {
-    spinner.classList.remove('show');
-    errBanner.classList.add('show');
-    setStatus('Error');
-  });
-
-  // Resilient Fetch with Chunked Stream
-  async function fetchWithProgress(url, signal, onChunk) {
-    const proxyList = [
-      url,
-      `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-    ];
-
-    let response = null;
-    for (const endpoint of proxyList) {
-      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-      try {
-        const res = await fetch(endpoint, { signal });
-        if (res.ok) {
-          response = res;
-          break;
-        }
-      } catch (e) {
-        if (signal.aborted) throw e;
-      }
-    }
-
-    if (!response) throw new Error('Could not fetch file from any origin');
-
-    const contentLength = +(response.headers.get('Content-Length') || 0);
-    
-    if (response.body && response.body.getReader) {
-      const reader = response.body.getReader();
-      let receivedLength = 0;
-      const chunks = [];
-
-      while (true) {
-        if (signal.aborted) {
-          reader.cancel();
-          throw new DOMException('Aborted', 'AbortError');
-        }
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        receivedLength += value.length;
-        onChunk(receivedLength, contentLength, value.length);
-      }
-      return new Blob(chunks);
-    } else {
-      const blob = await response.blob();
-      onChunk(blob.size, blob.size, blob.size);
-      return blob;
-    }
-  }
-
-  btnCancelDownload.addEventListener('click', () => {
-    if (currentAbortController) {
-      currentAbortController.abort();
-      currentAbortController = null;
-    }
-  });
-
-  async function downloadWholeZip() {
-    const raw = zipUrls.value.trim();
-    if (!raw) return alert('Please enter at least one URL');
-    const urls = raw.split('\n').map(u => u.trim()).filter(u => u.length > 0);
-    if (!urls.length) return;
-
-    currentAbortController = new AbortController();
-    const { signal } = currentAbortController;
-
-    telemetryBox.classList.add('active');
-    btnZipDownload.disabled = true;
-    btnCancelDownload.style.display = 'inline-flex';
-
-    const zip = new JSZip();
-    const totalFiles = urls.length;
-    const fileProgress = new Array(totalFiles).fill(0);
-    const fileSizes = new Array(totalFiles).fill(0);
-    let completedFiles = 0;
-
-    let lastBytesSample = 0;
-    let lastTimeSample = Date.now();
-
-    const updateTelemetryUI = () => {
-      const totalDownloaded = fileProgress.reduce((a, b) => a + b, 0);
-      const totalKnownSize = fileSizes.reduce((a, b) => a + b, 0);
-
-      const now = Date.now();
-      const elapsed = (now - lastTimeSample) / 1000;
-      if (elapsed >= 0.5) {
-        const bytesDiff = totalDownloaded - lastBytesSample;
-        const currentSpeed = bytesDiff / elapsed;
-        statSpeed.textContent = `${formatBytes(currentSpeed)}/s`;
-        lastBytesSample = totalDownloaded;
-        lastTimeSample = now;
-      }
-
-      if (totalKnownSize > 0) {
-        statSize.textContent = `${formatBytes(totalDownloaded)} / ${formatBytes(totalKnownSize)}`;
-      } else {
-        statSize.textContent = `${formatBytes(totalDownloaded)} / Estimating...`;
-      }
-
-      let pct = 0;
-      if (totalKnownSize > 0) {
-        pct = Math.min(95, Math.round((totalDownloaded / totalKnownSize) * 95));
-      } else {
-        pct = Math.min(95, Math.round((completedFiles / totalFiles) * 95));
-      }
-
-      zipPct.textContent = `${pct}%`;
-      zipBar.style.width = `${pct}%`;
-      zipFileProgressText.textContent = `File ${completedFiles} of ${totalFiles} completed`;
-      zipStatus.textContent = `Streaming chunks...`;
-    };
-
-    const sanitizeName = (url, idx) => {
-      try {
-        const u = new URL(url).pathname;
-        const name = u.substring(u.lastIndexOf('/') + 1);
-        if (name && name.includes('.')) return name;
-      } catch (e) {}
-      return `File_${String(idx + 1).padStart(2, '0')}.mp4`;
-    };
-
-    const tasks = urls.map(async (url, idx) => {
-      const fileName = sanitizeName(url, idx);
-      try {
-        const blob = await fetchWithProgress(url, signal, (received, total) => {
-          fileProgress[idx] = received;
-          if (total) fileSizes[idx] = total;
-          updateTelemetryUI();
-        });
-        zip.file(fileName, blob, { binary: true, compression: "STORE" });
-      } catch (err) {
-        if (err.name === 'AbortError') throw err;
-        zip.file(`${fileName}_ERROR.txt`, `Download Failed for ${url}\nError: ${err.message}`);
-      } finally {
-        completedFiles++;
-        updateTelemetryUI();
-      }
-    });
-
-    try {
-      await Promise.all(tasks);
-      
-      const totalDownloaded = fileProgress.reduce((a, b) => a + b, 0);
-      zipStatus.textContent = 'Building .ZIP Package...';
-      statSize.textContent = `${formatBytes(totalDownloaded)} (Final Size)`;
-      statSpeed.textContent = 'Finalizing...';
-      zipPct.textContent = '96%';
-      zipBar.style.width = '96%';
-      btnCancelDownload.style.display = 'none';
-
-      const zipBlob = await zip.generateAsync({
-        type: 'blob',
-        compression: 'STORE'
-      });
-
-      const outName = (zipName.value.trim() || 'Files_Batch') + '.zip';
-      saveAs(zipBlob, outName);
-
-      await saveArchiveToDB(outName, zipBlob, urls.length);
-      await renderArchives();
-
-      zipStatus.textContent = 'Download Complete & Stored!';
-      statSpeed.textContent = '0 B/s';
-      zipPct.textContent = '100%';
-      zipBar.style.width = '100%';
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        zipStatus.textContent = 'Download Canceled';
-        statSpeed.textContent = '0 B/s';
-        zipPct.textContent = '0%';
-        zipBar.style.width = '0%';
-        setStatus('Canceled', 'canceled');
-        setTimeout(() => telemetryBox.classList.remove('active'), 2500);
-      } else {
-        zipStatus.textContent = 'Error: ' + err.message;
-      }
-    } finally {
-      btnZipDownload.disabled = false;
-      currentAbortController = null;
-    }
-  }
-
-  btnZipDownload.addEventListener('click', downloadWholeZip);
-
-  // Initialize DB
-  renderArchives();
+(function(){
+"use strict";
+
+const $=id=>document.getElementById(id);
+const video=$("video"), playerCard=$("playerCard"), statusChip=$("statusChip"), spinner=$("spinner"), errBanner=$("errBanner");
+const streamUrl=$("streamUrl"), btnStream=$("btnStream");
+const btnPlayCenter=$("btnPlayCenter"), playIcon=$("playIcon"), btnBack10=$("btnBack10"), btnFwd10=$("btnFwd10");
+const btnMute=$("btnMute"), muteIcon=$("muteIcon"), btnFs=$("btnFs"), fsIcon=$("fsIcon"), speedSelect=$("speedSelect"), timeLabel=$("timeLabel");
+const seekWrap=$("seekWrap"), seekFill=$("seekFill"), seekBuffer=$("seekBuffer"), seekThumb=$("seekThumb");
+const animSkipLeft=$("animSkipLeft"), animSkipRight=$("animSkipRight");
+const navStream=$("navStream"), navZip=$("navZip"), navSettings=$("navSettings");
+const streamPanel=$("streamPanel"), zipPanel=$("zipPanel"), settingsPanel=$("settingsPanel");
+const zipUrls=$("zipUrls"), fileCountBadge=$("fileCountBadge"), zipName=$("zipName"), btnZipDownload=$("btnZipDownload");
+const btnCancelDownload=$("btnCancelDownload"), telemetryBox=$("telemetryBox"), zipStatus=$("zipStatus"), zipFileProgressText=$("zipFileProgressText");
+const zipPct=$("zipPct"), zipBar=$("zipBar"), statSize=$("statSize"), statSpeed=$("statSpeed");
+const archivesSection=$("archivesSection"), archivesList=$("archivesList");
+const storageUsageLabel=$("storageUsageLabel"), storageBarFill=$("storageBarFill"), btnClearAllStorage=$("btnClearAllStorage");
+const directFallback=$("directFallback"), btnDirectDownload=$("btnDirectDownload");
+
+let uiTimer=null,isScrubbing=false,wasPlaying=false,currentAbortController=null,lastDirectUrl="";
+
+/* ---------- helpers ---------- */
+function setStatus(text,type="default"){
+statusChip.textContent=text;
+statusChip.className="status-chip"+(type==="live"?" live":type==="canceled"?" canceled":"");
+}
+function fmtTime(sec){
+if(!Number.isFinite(sec)||sec<0)return"0:00";
+return Math.floor(sec/60)+":"+String(Math.floor(sec%60)).padStart(2,"0");
+}
+function formatBytes(bytes){
+if(!Number.isFinite(bytes)||bytes<=0)return"0 B";
+const units=["B","KB","MB","GB","TB"];
+const i=Math.min(Math.floor(Math.log(bytes)/Math.log(1024)),units.length-1);
+return (bytes/Math.pow(1024,i)).toFixed(i?1:0)+" "+units[i];
+}
+/* Fixed: always defined and never depends on Content-Disposition */
+function getFilename(url,index=0){
+try{
+const u=new URL(url);
+const path=u.pathname||"";
+let name=decodeURIComponent(path.substring(path.lastIndexOf("/")+1)).trim();
+if(name&&name!=="."&&name!=="..")return name.replace(/[<>:"/\\|?*\x00-\x1F]/g,"_");
+const cd=u.searchParams.get("response-content-disposition");
+if(cd){
+const m=cd.match(/filename\*?=(?:UTF-8''|["']?)([^;"']+)/i);
+if(m)return decodeURIComponent(m[1].replace(/^["']|["']$/g,"")).replace(/[<>:"/\\|?*\x00-\x1F]/g,"_");
+}
+}catch(e){}
+return"File_"+String(index+1).padStart(2,"0");
+}
+function isSignedStorageUrl(url){
+return /(?:X-Amz-|x-amz-|response-content-disposition=|GoogleAccessId=|Signature=)/.test(url);
+}
+function showUI(){
+playerCard.classList.remove("hide-ui");
+clearTimeout(uiTimer);
+uiTimer=setTimeout(()=>{if(!video.paused&&!isScrubbing)playerCard.classList.add("hide-ui")},3000);
+}
+
+/* ---------- tabs ---------- */
+function switchTab(btn,panel){
+[navStream,navZip,navSettings].forEach(x=>x.classList.remove("active"));
+[streamPanel,zipPanel,settingsPanel].forEach(x=>x.style.display="none");
+btn.classList.add("active");panel.style.display="flex";
+if(panel===settingsPanel)refreshStorageTelemetry();
+}
+navStream.onclick=()=>switchTab(navStream,streamPanel);
+navZip.onclick=()=>switchTab(navZip,zipPanel);
+navSettings.onclick=()=>switchTab(navSettings,settingsPanel);
+
+/* ---------- player ---------- */
+function playSource(url){
+url=String(url||"").trim();
+if(!url)return;
+errBanner.classList.remove("show");playerCard.classList.add("has-src");spinner.classList.add("show");setStatus("Loading…");
+video.pause();
+video.removeAttribute("src");
+video.src=url;
+video.load();
+video.play().then(()=>setStatus("Playing","live")).catch(()=>setStatus("Ready"));
+}
+btnStream.onclick=()=>playSource(streamUrl.value);
+streamUrl.addEventListener("keydown",e=>{if(e.key==="Enter")btnStream.click()});
+
+function togglePlay(){
+if(!video.src)return;
+if(video.paused)video.play().catch(()=>{});
+else video.pause();
+showUI();
+}
+function doSkip(seconds){
+if(!video.src||!Number.isFinite(video.duration))return false;
+try{
+const target=Math.min(video.duration,Math.max(0,video.currentTime+seconds));
+video.currentTime=target;
+updateSeekUI();
+showUI();
+return true;
+}catch(e){return false}
+}
+function showSkip(el){
+el.classList.remove("show");
+void el.offsetWidth;
+el.classList.add("show");
+clearTimeout(el._timer);
+el._timer=setTimeout(()=>el.classList.remove("show"),400);
+}
+btnPlayCenter.onclick=togglePlay;
+btnBack10.onclick=()=>{if(doSkip(-10))showSkip(animSkipLeft)};
+btnFwd10.onclick=()=>{if(doSkip(10))showSkip(animSkipRight)};
+
+/* Robust mobile double-tap: separate state for left/right */
+function installDoubleTap(el,side){
+let lastTap=0,timer=null;
+const handler=e=>{
+if(e.pointerType==="mouse"&&e.button!==0)return;
+e.preventDefault();
+const now=performance.now();
+if(now-lastTap<330){
+clearTimeout(timer);lastTap=0;
+if(doSkip(side==="left"?-10:10))showSkip(side==="left"?animSkipLeft:animSkipRight);
+}else{
+lastTap=now;
+clearTimeout(timer);
+timer=setTimeout(()=>{lastTap=0;if(playerCard.classList.contains("hide-ui"))showUI();else playerCard.classList.add("hide-ui")},330);
+}
+};
+el.addEventListener("pointerup",handler,{passive:false});
+}
+installDoubleTap($("touchLeft"),"left");
+installDoubleTap($("touchRight"),"right");
+
+function updateSeekUI(){
+const d=video.duration;
+if(!Number.isFinite(d)||d<=0)return;
+const pct=Math.max(0,Math.min(100,video.currentTime/d*100));
+seekFill.style.width=pct+"%";seekThumb.style.left=pct+"%";timeLabel.textContent=fmtTime(video.currentTime)+" / "+fmtTime(d);
+try{
+if(video.buffered.length){
+const end=video.buffered.end(video.buffered.length-1);
+seekBuffer.style.width=Math.min(100,end/d*100)+"%";
+}
+}catch(e){}
+}
+function seekTo(clientX){
+const r=seekWrap.getBoundingClientRect();
+const pct=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
+if(Number.isFinite(video.duration)&&video.duration>0){
+video.currentTime=pct*video.duration;updateSeekUI();
+}
+}
+seekWrap.addEventListener("pointerdown",e=>{
+if(!Number.isFinite(video.duration))return;
+isScrubbing=true;wasPlaying=!video.paused;video.pause();seekTo(e.clientX);showUI();
+const move=e2=>seekTo(e2.clientX);
+const up=()=>{isScrubbing=false;window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up);if(wasPlaying)video.play().catch(()=>{});showUI()};
+window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);
+});
+btnMute.onclick=()=>{video.muted=!video.muted;muteIcon.textContent=video.muted?"volume_off":"volume_up";showUI()};
+speedSelect.onchange=()=>{video.playbackRate=Number(speedSelect.value)||1};
+btnFs.onclick=()=>{
+if(playerCard.classList.contains("fakefs")){playerCard.classList.remove("fakefs");fsIcon.textContent="fullscreen"}
+else{playerCard.classList.add("fakefs");fsIcon.textContent="fullscreen_exit"}
+};
+video.addEventListener("play",()=>{playIcon.textContent="pause";setStatus("Playing","live");showUI()});
+video.addEventListener("pause",()=>{playIcon.textContent="play_arrow";setStatus("Paused");showUI()});
+video.addEventListener("timeupdate",updateSeekUI);
+video.addEventListener("loadedmetadata",()=>{spinner.classList.remove("show");updateSeekUI()});
+video.addEventListener("waiting",()=>spinner.classList.add("show"));
+video.addEventListener("playing",()=>spinner.classList.remove("show"));
+video.addEventListener("error",()=>{spinner.classList.remove("show");errBanner.textContent="Unable to load video. The server may block browser playback.";errBanner.classList.add("show");setStatus("Error")});
+
+/* ---------- IndexedDB ---------- */
+const DB_NAME="FluxplayStorageDB",DB_VERSION=1,STORE="archives";
+let db=null;
+function openDatabase(){
+return new Promise((resolve,reject)=>{
+if(db)return resolve(db);
+if(!window.indexedDB)return reject(new Error("IndexedDB unavailable"));
+const req=indexedDB.open(DB_NAME,DB_VERSION);
+req.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORE))d.createObjectStore(STORE,{keyPath:"id",autoIncrement:true})};
+req.onsuccess=e=>{db=e.target.result;db.onversionchange=()=>db.close();resolve(db)};
+req.onerror=()=>reject(req.error||new Error("IndexedDB open failed"));
+});
+}
+function txRequest(mode,fn){
+return openDatabase().then(d=>new Promise((resolve,reject)=>{
+const tx=d.transaction(STORE,mode),store=tx.objectStore(STORE);let result;
+try{result=fn(store)}catch(e){reject(e);return}
+result.onsuccess=e=>resolve(e.target.result);
+result.onerror=()=>reject(result.error||new Error("IndexedDB request failed"));
+}));
+}
+function saveArchiveToDB(name,blob,count){return txRequest("readwrite",s=>s.add({name,blob,count,createdAt:Date.now(),size:blob.size}))}
+function getAllArchivesFromDB(){return txRequest("readonly",s=>s.getAll())}
+function deleteArchiveFromDB(id){return txRequest("readwrite",s=>s.delete(id))}
+function clearAllFromDB(){return txRequest("readwrite",s=>s.clear())}
+async function refreshStorageTelemetry(){
+try{
+if(navigator.storage&&navigator.storage.estimate){
+const e=await navigator.storage.estimate(),usage=e.usage||0,quota=e.quota||1;
+storageUsageLabel.textContent=formatBytes(usage);
+storageBarFill.style.width=Math.min(100,Math.round(usage/quota*100))+"%";
+}else{
+const a=await getAllArchivesFromDB(),n=a.reduce((x,y)=>x+(y.size||0),0);
+storageUsageLabel.textContent=formatBytes(n);storageBarFill.style.width="0%";
+}
+}catch(e){}
+}
+async function renderArchives(){
+try{
+const a=await getAllArchivesFromDB();
+archivesList.innerHTML="";
+if(!a.length){archivesSection.style.display="none";await refreshStorageTelemetry();return}
+archivesSection.style.display="flex";
+a.sort((x,y)=>(y.createdAt||0)-(x.createdAt||0)).forEach(arch=>{
+const item=document.createElement("div");item.className="archive-item";
+const meta=document.createElement("div");meta.className="archive-meta";
+const bubble=document.createElement("div");bubble.className="zip-icon-bubble";bubble.innerHTML='<span class="material-symbols-rounded">folder_zip</span>';
+const info=document.createElement("div");
+const name=document.createElement("div");name.className="archive-name";name.textContent=arch.name;
+const size=document.createElement("div");size.className="archive-size";size.textContent=formatBytes(arch.size)+" • "+arch.count+" files";
+info.append(name,size);meta.append(bubble,info);
+const actions=document.createElement("div");actions.className="archive-actions";
+const dl=document.createElement("button");dl.className="icon-btn-sm";dl.title="Re-download";dl.innerHTML='<span class="material-symbols-rounded">download</span>';
+dl.onclick=async()=>{try{const all=await getAllArchivesFromDB(),x=all.find(v=>v.id===arch.id);if(x?.blob)saveAs(x.blob,x.name)}catch(e){alert("Could not reopen archive: "+e.message)}};
+const del=document.createElement("button");del.className="icon-btn-sm delete";del.title="Delete";del.innerHTML='<span class="material-symbols-rounded">delete</span>';
+del.onclick=async()=>{await deleteArchiveFromDB(arch.id);renderArchives()};
+actions.append(dl,del);item.append(meta,actions);archivesList.appendChild(item);
+});
+await refreshStorageTelemetry();
+}catch(e){console.warn(e)}
+}
+btnClearAllStorage.onclick=async()=>{
+if(confirm("Clear all downloaded archives?")){await clearAllFromDB();renderArchives()}
+};
+
+/* ---------- URL input ---------- */
+function getUrls(){
+return zipUrls.value.replace(/\r/g,"").split("\n").map(x=>x.trim()).filter(Boolean);
+}
+zipUrls.addEventListener("input",()=>{
+const n=getUrls().length;fileCountBadge.textContent=n+" "+(n===1?"File Available":"Files Available");
+});
+
+/* ---------- Direct download ---------- */
+function nativeDownload(url){
+lastDirectUrl=url;
+try{
+const a=document.createElement("a");
+a.href=url;a.target="_blank";a.rel="noopener";
+document.body.appendChild(a);a.click();a.remove();
+}catch(e){
+window.open(url,"_blank","noopener");
+}
+}
+btnDirectDownload.onclick=()=>{
+const urls=getUrls();
+if(urls.length)nativeDownload(urls[0]);
+};
+
+/* ---------- Fetch: NO random CORS proxies ---------- */
+async function fetchDirect(url,signal,onProgress){
+const res=await fetch(url,{
+method:"GET",
+signal,
+cache:"no-store",
+credentials:"omit",
+redirect:"follow"
+});
+if(!res.ok)throw new Error("HTTP "+res.status);
+const total=Number(res.headers.get("Content-Length"))||0;
+if(!res.body||!res.body.getReader){
+const blob=await res.blob();onProgress(blob.size,total||blob.size,blob.size);return blob;
+}
+const reader=res.body.getReader();
+const chunks=[];let received=0;
+try{
+while(true){
+if(signal.aborted){try{await reader.cancel()}catch(e){}throw new DOMException("Aborted","AbortError")}
+const {done,value}=await reader.read();if(done)break;
+if(value){chunks.push(value);received+=value.byteLength;onProgress(received,total,value.byteLength)}
+}
+}catch(e){try{reader.releaseLock()}catch(x){};throw e}
+return new Blob(chunks);
+}
+
+/* ---------- ZIP engine ---------- */
+async function downloadWholeZip(){
+const urls=getUrls();
+if(!urls.length){alert("Please enter at least one URL.");return}
+
+directFallback.classList.remove("show");
+telemetryBox.classList.add("active");
+btnZipDownload.disabled=true;btnCancelDownload.style.display="inline-flex";
+currentAbortController=new AbortController();
+const signal=currentAbortController.signal;
+
+const zip=new JSZip();
+const totalFiles=urls.length;
+const progress=new Array(totalFiles).fill(0);
+const sizes=new Array(totalFiles).fill(0);
+let completed=0,lastBytes=0,lastTime=performance.now();
+
+function telemetry(){
+const downloaded=progress.reduce((a,b)=>a+b,0),known=sizes.reduce((a,b)=>a+b,0);
+const now=performance.now(),dt=(now-lastTime)/1000;
+if(dt>=.4){
+statSpeed.textContent=formatBytes((downloaded-lastBytes)/dt)+"/s";
+lastBytes=downloaded;lastTime=now;
+}
+statSize.textContent=known?formatBytes(downloaded)+" / "+formatBytes(known):formatBytes(downloaded)+" / Unknown";
+const pct=known?Math.min(94,Math.round(downloaded/known*94)):Math.min(94,Math.round(completed/totalFiles*94));
+zipPct.textContent=pct+"%";zipBar.style.width=pct+"%";
+zipFileProgressText.textContent="File "+completed+" of "+totalFiles+" completed";
+}
+try{
+for(let i=0;i<urls.length;i++){
+if(signal.aborted)throw new DOMException("Aborted","AbortError");
+const url=urls[i],name=getFilename(url,i);
+zipStatus.textContent="Downloading "+name;
+zipFileProgressText.textContent="File "+(i+1)+" of "+totalFiles;
+try{
+const blob=await fetchDirect(url,signal,(received,total)=>{
+progress[i]=received;if(total)sizes[i]=total;telemetry();
+});
+zip.file(name,blob,{binary:true,compression:"STORE"});
+}catch(err){
+if(err.name==="AbortError")throw err;
+/* If browser CORS blocks JS, don't waste time on proxy retries. */
+if(err instanceof TypeError||/Failed to fetch|NetworkError|CORS/i.test(err.message)){
+directFallback.classList.add("show");
+zipStatus.textContent="Browser blocked file access";
+throw new Error("This browser does not allow JavaScript to read this remote file. Direct download is available below.");
+}
+zip.file(name+"_ERROR.txt","Download failed for "+url+"\nError: "+err.message);
+}
+completed++;telemetry();
+}
+zipStatus.textContent="Building ZIP…";zipPct.textContent="96%";zipBar.style.width="96%";statSpeed.textContent="Finalizing…";
+const zipBlob=await zip.generateAsync({type:"blob",compression:"STORE"},meta=>{zipPct.textContent=Math.max(96,Math.round(96+meta.percent*.04))+"%";zipBar.style.width=Math.max(96,Math.round(96+meta.percent*.04))+"%"});
+const out=(zipName.value.trim()||"Files_Batch").replace(/[<>:"/\\|?*]/g,"_")+".zip";
+saveAs(zipBlob,out);
+try{await saveArchiveToDB(out,zipBlob,urls.length)}catch(e){console.warn("Archive DB save failed:",e)}
+await renderArchives();
+zipStatus.textContent="ZIP Download Complete";
+zipPct.textContent="100%";zipBar.style.width="100%";statSpeed.textContent="0 B/s";
+}catch(err){
+if(err.name==="AbortError"){
+zipStatus.textContent="Download Canceled";zipPct.textContent="0%";zipBar.style.width="0%";statSpeed.textContent="0 B/s";setStatus("Canceled","canceled");
+}else{
+zipStatus.textContent=err.message||"Download failed";
+if(/blocked|CORS|JavaScript to read/i.test(err.message))setStatus("Direct download available");
+else setStatus("Error");
+}
+}finally{
+btnZipDownload.disabled=false;btnCancelDownload.style.display="inline-flex";currentAbortController=null;
+}
+}
+btnZipDownload.onclick=downloadWholeZip;
+btnCancelDownload.onclick=()=>{
+if(currentAbortController){currentAbortController.abort();currentAbortController=null}
+};
+
+/* Prevent accidental form-like reloads */
+document.addEventListener("keydown",e=>{
+if(e.key==="Enter"&&document.activeElement===zipUrls)e.preventDefault();
+});
+
+renderArchives();
 })();
 </script>
 </body>
