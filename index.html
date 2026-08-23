@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0d0e14">
 <title>Fluxplay — Direct Media & Batch Downloader</title>
 
@@ -16,1140 +16,935 @@
 
 <style>
 :root{
---bg:#0d0e14;
---surface:#151620;
---variant:#1e1f2d;
---container:#191a26;
---primary:#a78bfa;
---primary2:#6366f1;
---accent:#f43f5e;
---text:#f3f4f6;
---subtle:#9ca3af;
---error:#fb7185;
---success:#34d399;
---outline:rgba(255,255,255,.08);
---rsm:10px;
---rmd:16px;
---rlg:24px;
---full:9999px
+  --bg:#0d0e14;
+  --surface:#151620;
+  --variant:#1e1f2d;
+  --container:#191a26;
+  --primary:#a78bfa;
+  --primary2:#6366f1;
+  --accent:#f43f5e;
+  --text:#f3f4f6;
+  --subtle:#9ca3af;
+  --error:#fb7185;
+  --success:#34d399;
+  --outline:rgba(255,255,255,.08);
+  --rsm:10px;
+  --rmd:16px;
+  --rlg:24px;
+  --full:9999px;
+  --nav-height: 64px;
 }
 
 *{
-box-sizing:border-box;
--webkit-tap-highlight-color:transparent;
-margin:0;
-padding:0
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+  margin:0;
+  padding:0;
 }
 
 html,body{
-width:100%;
-height:100%;
-background:var(--bg);
-color:var(--text);
-font-family:'Plus Jakarta Sans',sans-serif;
-overflow-x:hidden
+  width:100%;
+  height:100%;
+  height:100dvh;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Plus Jakarta Sans',sans-serif;
+  overflow:hidden;
 }
 
 body{
-display:flex;
-justify-content:center
+  display:flex;
+  justify-content:center;
 }
 
 button,input,textarea,select{
-font:inherit
+  font:inherit;
+  color:inherit;
 }
 
 .android-frame{
-width:100%;
-max-width:480px;
-height:100%;
-display:flex;
-flex-direction:column;
-position:relative;
-background:var(--bg)
+  width:100%;
+  max-width:540px;
+  height:100%;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  position:relative;
+  background:var(--bg);
 }
 
+/* ================= TOP BAR ================= */
+
 .top-app-bar{
-height:58px;
-display:flex;
-align-items:center;
-justify-content:space-between;
-padding:0 18px;
-padding-top:env(safe-area-inset-top)
+  min-height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:env(safe-area-inset-top, 12px) 16px 8px 16px;
+  background:var(--bg);
+  z-index:10;
 }
 
 .app-title{
-font-size:20px;
-font-weight:800;
-letter-spacing:-.02em;
-display:flex;
-align-items:center;
-gap:8px
+  font-size:19px;
+  font-weight:800;
+  letter-spacing:-.02em;
+  display:flex;
+  align-items:center;
+  gap:8px;
 }
 
 .logo-icon{
-width:28px;
-height:28px;
-border-radius:8px;
-background:linear-gradient(135deg,var(--primary),var(--accent));
-display:flex;
-align-items:center;
-justify-content:center;
-color:#fff
-}
-
-.logo-icon .material-symbols-rounded{
-font-size:18px
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  background:linear-gradient(135deg,var(--primary),var(--accent));
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  flex-shrink:0;
 }
 
 .status-chip{
-font-size:11.5px;
-font-weight:600;
-padding:5px 12px;
-border-radius:var(--full);
-background:var(--container);
-color:var(--subtle);
-border:1px solid var(--outline);
-display:inline-flex;
-align-items:center;
-gap:6px
+  font-size:11px;
+  font-weight:600;
+  padding:5px 12px;
+  border-radius:var(--full);
+  background:var(--container);
+  color:var(--subtle);
+  border:1px solid var(--outline);
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  max-width:140px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
 .status-chip.live{
-color:var(--success);
-border-color:rgba(52,211,153,.25);
-background:rgba(52,211,153,.08)
+  color:var(--success);
+  border-color:rgba(52,211,153,.25);
+  background:rgba(52,211,153,.08);
 }
 
 .status-chip.live:before{
-content:"";
-width:6px;
-height:6px;
-border-radius:50%;
-background:var(--success);
-box-shadow:0 0 8px var(--success)
+  content:"";
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--success);
+  box-shadow:0 0 8px var(--success);
 }
 
 .status-chip.canceled{
-color:var(--error);
-border-color:rgba(251,113,133,.25);
-background:rgba(251,113,133,.08)
+  color:var(--error);
+  border-color:rgba(251,113,133,.25);
+  background:rgba(251,113,133,.08);
 }
 
+/* ================= SCROLL CONTAINER ================= */
+
 .content-scroll{
-flex:1;
-overflow-y:auto;
-padding:6px 16px calc(80px + env(safe-area-inset-bottom)) 16px;
-display:flex;
-flex-direction:column;
-gap:14px
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding:4px 14px calc(var(--nav-height) + env(safe-area-inset-bottom, 16px) + 20px) 14px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
 }
 
 /* ================= PLAYER ================= */
 
 .player-card{
-position:relative;
-width:100%;
-aspect-ratio:16/9;
-background:#000;
-border-radius:var(--rlg);
-overflow:hidden;
-box-shadow:0 10px 30px rgba(0,0,0,.6);
-border:1px solid var(--outline)
+  position:relative;
+  width:100%;
+  aspect-ratio:16/9;
+  background:#000;
+  border-radius:var(--rmd);
+  overflow:hidden;
+  box-shadow:0 10px 24px rgba(0,0,0,.5);
+  border:1px solid var(--outline);
+  flex-shrink:0;
 }
 
-.player-card.fakefs{
-position:fixed!important;
-inset:0!important;
-z-index:999999!important;
-width:100vw!important;
-height:100dvh!important;
-max-width:none!important;
-border-radius:0!important;
-border:none!important;
-aspect-ratio:auto!important
-}
-
+.player-card.fakefs,
 .player-card:fullscreen{
-width:100vw;
-height:100vh;
-max-width:none;
-max-height:none;
-aspect-ratio:auto;
-border:none;
-border-radius:0;
-background:#000
-}
-
-.player-card:fullscreen video{
-width:100%;
-height:100%;
-object-fit:contain
+  position:fixed!important;
+  inset:0!important;
+  z-index:999999!important;
+  width:100vw!important;
+  height:100dvh!important;
+  max-width:none!important;
+  max-height:none!important;
+  border-radius:0!important;
+  border:none!important;
+  aspect-ratio:auto!important;
+  background:#000;
 }
 
 video{
-width:100%;
-height:100%;
-display:block;
-object-fit:contain;
-background:#000
+  width:100%;
+  height:100%;
+  display:block;
+  object-fit:contain;
+  background:#000;
 }
 
-/* ================= TOUCH GESTURES ================= */
+video::cue {
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: 4px;
+}
 
 .gesture-surface{
-position:absolute;
-inset:0;
-z-index:3;
-display:grid;
-grid-template-columns:1fr 1fr;
-touch-action:none;
--webkit-user-select:none;
-user-select:none
+  position:absolute;
+  inset:0;
+  z-index:3;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  touch-action:none;
+  user-select:none;
 }
 
 .touch-half{
-width:100%;
-height:100%;
-touch-action:none;
--webkit-user-select:none;
-user-select:none
+  width:100%;
+  height:100%;
+  touch-action:none;
 }
 
-/* ================= EMPTY ================= */
-
 .player-empty{
-position:absolute;
-inset:0;
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-gap:8px;
-color:var(--subtle);
-z-index:2;
-pointer-events:none
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  color:var(--subtle);
+  z-index:2;
+  pointer-events:none;
 }
 
 .player-empty .material-symbols-rounded{
-font-size:42px;
-color:var(--primary)
+  font-size:36px;
+  color:var(--primary);
 }
 
 .player-card.has-src .player-empty{
-display:none
+  display:none;
 }
 
-/* ================= SPINNER ================= */
-
 .spinner{
-position:absolute;
-inset:0;
-display:none;
-align-items:center;
-justify-content:center;
-background:rgba(0,0,0,.4);
-pointer-events:none;
-z-index:5
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.4);
+  pointer-events:none;
+  z-index:5;
 }
 
 .spinner.show{
-display:flex
+  display:flex;
 }
 
 .spinner-ring{
-width:38px;
-height:38px;
-border-radius:50%;
-border:3.5px solid rgba(255,255,255,.15);
-border-top-color:var(--primary);
-animation:spin .8s linear infinite
+  width:36px;
+  height:36px;
+  border-radius:50%;
+  border:3.5px solid rgba(255,255,255,.15);
+  border-top-color:var(--primary);
+  animation:spin .8s linear infinite;
 }
 
 @keyframes spin{
-to{transform:rotate(360deg)}
+  to{transform:rotate(360deg)}
 }
 
-/* ================= ERROR ================= */
-
 .err-banner{
-position:absolute;
-inset:0;
-display:none;
-align-items:center;
-justify-content:center;
-background:rgba(13,14,20,.96);
-padding:20px;
-text-align:center;
-font-size:13px;
-color:var(--error);
-z-index:6
+  position:absolute;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(13,14,20,.95);
+  padding:16px;
+  text-align:center;
+  font-size:12px;
+  color:var(--error);
+  z-index:6;
 }
 
 .err-banner.show{
-display:flex
+  display:flex;
 }
 
-/* ================= SKIP ================= */
-
 .skip-feedback{
-position:absolute;
-top:0;
-bottom:0;
-width:40%;
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-color:#fff;
-font-weight:700;
-font-size:13px;
-z-index:20;
-opacity:0;
-pointer-events:none;
-transition:opacity .15s
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:40%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-weight:700;
+  font-size:12px;
+  z-index:20;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s;
 }
 
 .skip-feedback.left{
-left:0;
-background:radial-gradient(
-circle at 30% 50%,
-rgba(167,139,250,.25),
-transparent 70%
-)
+  left:0;
+  background:radial-gradient(circle at 30% 50%, rgba(167,139,250,.3), transparent 70%);
 }
 
 .skip-feedback.right{
-right:0;
-background:radial-gradient(
-circle at 70% 50%,
-rgba(167,139,250,.25),
-transparent 70%
-)
+  right:0;
+  background:radial-gradient(circle at 70% 50%, rgba(167,139,250,.3), transparent 70%);
 }
 
 .skip-feedback.show{
-opacity:1
+  opacity:1;
 }
 
 .skip-feedback .material-symbols-rounded{
-font-size:32px
+  font-size:28px;
 }
 
-/* ================= PLAYER UI ================= */
+/* ================= PLAYER UI CONTROLS ================= */
 
 .player-ui{
-position:absolute;
-inset:0;
-
-background:linear-gradient(
-to top,
-rgba(0,0,0,.9) 0%,
-rgba(0,0,0,.25) 50%,
-rgba(0,0,0,.65) 100%
-);
-
-display:flex;
-flex-direction:column;
-justify-content:space-between;
-
-padding:12px;
-
-opacity:1;
-transition:opacity .22s ease;
-
-z-index:7;
-
-pointer-events:none
+  position:absolute;
+  inset:0;
+  background:linear-gradient(to top, rgba(0,0,0,.9) 0%, rgba(0,0,0,.15) 50%, rgba(0,0,0,.7) 100%);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:10px 12px;
+  opacity:1;
+  transition:opacity .22s ease;
+  z-index:7;
+  pointer-events:none;
 }
 
 .player-ui button,
 .player-ui select,
 .player-ui .seek-slider-container{
-pointer-events:auto
+  pointer-events:auto;
 }
 
 .player-card.hide-ui .player-ui{
-opacity:0;
-pointer-events:none
+  opacity:0;
+  pointer-events:none;
 }
 
 .player-top-controls{
-display:flex;
-justify-content:flex-end;
-align-items:center;
-gap:6px
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:6px;
+}
+
+.cc-btn{
+  background:rgba(255,255,255,.12);
+  border:1px solid var(--outline);
+  border-radius:var(--rsm);
+  height:32px;
+  width:38px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:background .2s, color .2s;
+  color:#fff;
+  cursor:pointer;
+}
+
+.cc-btn.active{
+  background:var(--primary);
+  color:#0d0e14;
+  border-color:var(--primary);
+}
+
+.cc-btn.active .material-symbols-rounded{
+  color:#0d0e14;
 }
 
 .center-controls{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-
-display:flex;
-align-items:center;
-gap:18px;
-
-z-index:8
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  display:flex;
+  align-items:center;
+  gap:16px;
+  z-index:8;
 }
 
 .btn-circle{
-width:48px;
-height:48px;
-border-radius:50%;
-
-background:rgba(30,31,45,.85);
-backdrop-filter:blur(12px);
-
-border:1px solid rgba(255,255,255,.1);
-
-color:#fff;
-
-display:flex;
-align-items:center;
-justify-content:center;
-
-cursor:pointer
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  background:rgba(30,31,45,.85);
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.1);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  touch-action:manipulation;
 }
 
 .btn-circle:active{
-transform:scale(.9)
+  transform:scale(.92);
 }
 
 .btn-circle.play-btn{
-width:56px;
-height:56px;
-
-background:linear-gradient(
-135deg,
-var(--primary),
-var(--primary2)
-);
-
-border:none;
-
-box-shadow:
-0 4px 16px rgba(167,139,250,.4)
+  width:52px;
+  height:52px;
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  border:none;
+  box-shadow:0 4px 16px rgba(167,139,250,.4);
 }
 
 .bottom-controls{
-display:flex;
-flex-direction:column;
-gap:4px
+  display:flex;
+  flex-direction:column;
+  gap:2px;
 }
 
 .seek-slider-container{
-position:relative;
-height:24px;
-
-display:flex;
-align-items:center;
-
-cursor:pointer;
-
-touch-action:none
+  position:relative;
+  height:32px;
+  display:flex;
+  align-items:center;
+  cursor:pointer;
+  touch-action:none;
 }
 
 .seek-track{
-width:100%;
-height:4px;
-
-border-radius:2px;
-
-background:rgba(255,255,255,.2);
-
-position:relative
+  width:100%;
+  height:5px;
+  border-radius:3px;
+  background:rgba(255,255,255,.2);
+  position:relative;
 }
 
 .seek-buffer,
 .seek-fill{
-position:absolute;
-height:100%;
-left:0;
-border-radius:2px
+  position:absolute;
+  height:100%;
+  left:0;
+  border-radius:3px;
 }
 
 .seek-buffer{
-background:rgba(255,255,255,.35)
+  background:rgba(255,255,255,.35);
 }
 
 .seek-fill{
-background:var(--primary)
+  background:var(--primary);
 }
 
 .seek-thumb{
-position:absolute;
-
-width:12px;
-height:12px;
-
-border-radius:50%;
-
-background:#fff;
-
-transform:translateX(-50%);
-
-box-shadow:0 0 8px rgba(0,0,0,.8);
-
-pointer-events:none
+  position:absolute;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:#fff;
+  transform:translateX(-50%);
+  box-shadow:0 0 8px rgba(0,0,0,.8);
+  pointer-events:none;
 }
 
 .ctrl-bar{
-display:flex;
-align-items:center;
-justify-content:space-between
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
 }
 
 .ctrl-actions{
-display:flex;
-align-items:center;
-gap:4px
+  display:flex;
+  align-items:center;
+  gap:4px;
 }
 
 .icon-action{
-background:none;
-border:none;
-color:#fff;
-cursor:pointer;
-padding:6px;
-border-radius:var(--full);
-
-display:flex;
-align-items:center;
-justify-content:center
+  background:none;
+  border:none;
+  color:#fff;
+  cursor:pointer;
+  min-width:38px;
+  min-height:38px;
+  padding:6px;
+  border-radius:var(--full);
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
 .time-chip{
-font-size:11px;
-font-family:'JetBrains Mono',monospace;
-color:#d1d5db
+  font-size:11px;
+  font-family:'JetBrains Mono',monospace;
+  color:#d1d5db;
 }
 
 .md-select{
-background:rgba(255,255,255,.12);
-color:#fff;
-
-border:1px solid var(--outline);
-
-border-radius:var(--rsm);
-
-font-size:11px;
-
-padding:5px 8px;
-
-outline:none
+  background:rgba(255,255,255,.12);
+  color:#fff;
+  border:1px solid var(--outline);
+  border-radius:var(--rsm);
+  font-size:11px;
+  padding:6px 8px;
+  outline:none;
+  height:32px;
 }
 
 .md-select option{
-background:var(--surface);
-color:#fff
+  background:var(--surface);
+  color:#fff;
 }
 
-/* ================= CARDS ================= */
+/* ================= CARDS & FORMS ================= */
 
 .md-card{
-background:var(--surface);
-
-border-radius:var(--rlg);
-
-padding:16px;
-
-display:flex;
-flex-direction:column;
-gap:12px;
-
-border:1px solid var(--outline)
+  background:var(--surface);
+  border-radius:var(--rmd);
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  border:1px solid var(--outline);
 }
 
 .card-label{
-font-size:12px;
-font-weight:700;
-
-color:var(--primary);
-
-text-transform:uppercase;
-
-letter-spacing:.06em;
-
-display:flex;
-align-items:center;
-justify-content:space-between
+  font-size:11.5px;
+  font-weight:700;
+  color:var(--primary);
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
 }
 
 .count-pill{
-background:var(--variant);
-
-border:1px solid var(--outline);
-
-color:var(--text);
-
-padding:3px 10px;
-
-border-radius:var(--full);
-
-font-size:11px;
-
-font-weight:700;
-
-font-family:'JetBrains Mono',monospace
+  background:var(--variant);
+  border:1px solid var(--outline);
+  color:var(--text);
+  padding:3px 8px;
+  border-radius:var(--full);
+  font-size:10px;
+  font-weight:700;
+  font-family:'JetBrains Mono',monospace;
 }
 
 .md-input{
-width:100%;
-
-background:var(--container);
-
-border:1px solid var(--outline);
-
-color:var(--text);
-
-padding:12px 14px;
-
-border-radius:var(--rmd);
-
-font-size:13px;
-
-outline:none;
-
-transition:border-color .2s
+  width:100%;
+  background:var(--container);
+  border:1px solid var(--outline);
+  color:var(--text);
+  padding:12px 14px;
+  border-radius:var(--rsm);
+  font-size:13px;
+  outline:none;
+  transition:border-color .2s;
+  min-height:44px;
 }
 
 .md-input:focus{
-border-color:var(--primary)
+  border-color:var(--primary);
 }
 
 textarea.md-input{
-resize:vertical;
-
-min-height:90px;
-
-line-height:1.45;
-
-font-family:'JetBrains Mono',monospace;
-
-font-size:12px;
-
-user-select:text;
--webkit-user-select:text
+  resize:vertical;
+  min-height:80px;
+  line-height:1.45;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11.5px;
+  user-select:text;
+  -webkit-user-select:text;
 }
 
 .md-btn{
-background:linear-gradient(
-135deg,
-var(--primary),
-var(--primary2)
-);
-
-color:#fff;
-
-border:none;
-
-padding:12px 18px;
-
-border-radius:var(--full);
-
-font-weight:700;
-
-font-size:13.5px;
-
-display:inline-flex;
-
-align-items:center;
-justify-content:center;
-
-gap:8px;
-
-cursor:pointer;
-
-box-shadow:
-0 4px 14px rgba(167,139,250,.3)
+  background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:#fff;
+  border:none;
+  min-height:44px;
+  padding:10px 16px;
+  border-radius:var(--full);
+  font-weight:700;
+  font-size:13px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  cursor:pointer;
+  box-shadow:0 4px 14px rgba(167,139,250,.3);
+  touch-action:manipulation;
+  white-space:nowrap;
 }
 
 .md-btn:active{
-transform:scale(.97)
+  transform:scale(.98);
 }
 
 .md-btn:disabled{
-opacity:.4;
-
-cursor:not-allowed;
-
-box-shadow:none
+  opacity:.4;
+  cursor:not-allowed;
+  box-shadow:none;
 }
 
 .md-btn-secondary{
-background:rgba(255,255,255,.08);
-
-color:var(--text);
-
-border:1px solid var(--outline);
-
-padding:10px 14px;
-
-border-radius:var(--rmd);
-
-font-weight:700;
-
-font-size:12px;
-
-display:inline-flex;
-
-align-items:center;
-justify-content:center;
-
-gap:6px;
-
-cursor:pointer
+  background:rgba(255,255,255,.08);
+  color:var(--text);
+  border:1px solid var(--outline);
+  min-height:44px;
+  padding:10px 14px;
+  border-radius:var(--rsm);
+  font-weight:700;
+  font-size:12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  cursor:pointer;
 }
 
 .md-btn-cancel{
-background:rgba(251,113,133,.15);
-
-color:var(--error);
-
-border:1px solid rgba(251,113,133,.3);
-
-padding:6px 12px;
-
-border-radius:var(--full);
-
-font-weight:700;
-
-font-size:11.5px;
-
-display:inline-flex;
-
-align-items:center;
-
-gap:4px;
-
-cursor:pointer
+  background:rgba(251,113,133,.15);
+  color:var(--error);
+  border:1px solid rgba(251,113,133,.3);
+  padding:6px 12px;
+  border-radius:var(--full);
+  font-weight:700;
+  font-size:11px;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  cursor:pointer;
 }
 
 .md-btn-danger{
-background:rgba(251,113,133,.12);
+  background:rgba(251,113,133,.12);
+  color:var(--error);
+  border:1px solid rgba(251,113,133,.25);
+  min-height:44px;
+  padding:10px 16px;
+  border-radius:var(--rsm);
+  font-weight:700;
+  font-size:13px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  cursor:pointer;
+}
 
-color:var(--error);
+.input-btn-group{
+  display:flex;
+  gap:8px;
+}
 
-border:1px solid rgba(251,113,133,.25);
-
-padding:10px 16px;
-
-border-radius:var(--rmd);
-
-font-weight:700;
-
-font-size:13px;
-
-display:inline-flex;
-
-align-items:center;
-justify-content:center;
-
-gap:6px;
-
-cursor:pointer
+@media(max-width: 380px){
+  .input-btn-group{
+    flex-direction:column;
+  }
 }
 
 /* ================= SUBTITLES ================= */
 
 .subtitle-info{
-font-size:11px;
-color:var(--subtle);
-line-height:1.45
+  font-size:11px;
+  color:var(--subtle);
+  line-height:1.4;
 }
 
 .subtitle-row{
-display:flex;
-gap:8px;
-align-items:center
-}
-
-.subtitle-row .md-input{
-flex:1
+  display:flex;
+  gap:8px;
+  align-items:center;
 }
 
 .subtitle-actions{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:8px
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
 }
 
 .subtitle-status{
-font-size:11px;
-color:var(--subtle);
-
-padding:8px 10px;
-
-border-radius:var(--rsm);
-
-background:var(--container);
-
-border:1px solid var(--outline)
+  font-size:11px;
+  color:var(--subtle);
+  padding:8px 10px;
+  border-radius:var(--rsm);
+  background:var(--container);
+  border:1px solid var(--outline);
 }
 
 /* ================= TELEMETRY ================= */
 
 .telemetry-card{
-background:var(--container);
-
-border:1px solid var(--outline);
-
-border-radius:var(--rmd);
-
-padding:14px;
-
-display:none;
-
-flex-direction:column;
-
-gap:10px
+  background:var(--container);
+  border:1px solid var(--outline);
+  border-radius:var(--rsm);
+  padding:12px;
+  display:none;
+  flex-direction:column;
+  gap:8px;
 }
 
 .telemetry-card.active{
-display:flex
+  display:flex;
 }
 
 .telemetry-header{
-display:flex;
-
-justify-content:space-between;
-
-align-items:flex-start
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
 }
 
 .telemetry-status{
-font-size:13px;
-font-weight:700
+  font-size:12px;
+  font-weight:700;
 }
 
 .telemetry-percentage{
-font-size:18px;
-
-font-weight:800;
-
-font-family:'JetBrains Mono',monospace;
-
-color:var(--primary)
+  font-size:16px;
+  font-weight:800;
+  font-family:'JetBrains Mono',monospace;
+  color:var(--primary);
 }
 
 .progress-track{
-height:8px;
-
-background:rgba(255,255,255,.08);
-
-border-radius:var(--full);
-
-overflow:hidden;
-
-position:relative
+  height:6px;
+  background:rgba(255,255,255,.08);
+  border-radius:var(--full);
+  overflow:hidden;
+  position:relative;
 }
 
 .progress-fill{
-height:100%;
-
-width:0;
-
-background:linear-gradient(
-90deg,
-var(--primary),
-var(--accent)
-);
-
-transition:width .15s ease
+  height:100%;
+  width:0;
+  background:linear-gradient(90deg,var(--primary),var(--accent));
+  transition:width .15s ease;
 }
 
 .telemetry-grid{
-display:grid;
-
-grid-template-columns:1fr 1fr;
-
-gap:8px;
-
-padding-top:4px
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  padding-top:2px;
 }
 
 .stat-chip{
-background:var(--variant);
-
-padding:8px 10px;
-
-border-radius:var(--rsm);
-
-display:flex;
-
-flex-direction:column;
-
-gap:2px
+  background:var(--variant);
+  padding:6px 8px;
+  border-radius:var(--rsm);
+  display:flex;
+  flex-direction:column;
+  gap:2px;
 }
 
 .stat-label{
-font-size:10px;
-
-font-weight:600;
-
-color:var(--subtle);
-
-text-transform:uppercase
+  font-size:9.5px;
+  font-weight:600;
+  color:var(--subtle);
+  text-transform:uppercase;
 }
 
 .stat-value{
-font-size:12px;
-
-font-weight:700;
-
-font-family:'JetBrains Mono',monospace
+  font-size:11px;
+  font-weight:700;
+  font-family:'JetBrains Mono',monospace;
 }
 
 /* ================= ARCHIVES ================= */
 
 .saved-archives{
-display:flex;
-flex-direction:column;
-gap:8px
+  display:flex;
+  flex-direction:column;
+  gap:8px;
 }
 
 .archive-item{
-background:var(--container);
-
-border-radius:var(--rmd);
-
-padding:12px 14px;
-
-display:flex;
-
-align-items:center;
-
-justify-content:space-between;
-
-border:1px solid var(--outline)
+  background:var(--container);
+  border-radius:var(--rsm);
+  padding:10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border:1px solid var(--outline);
+  gap:8px;
 }
 
 .archive-meta{
-display:flex;
-
-align-items:center;
-
-gap:12px;
-
-min-width:0
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  flex:1;
 }
 
 .zip-icon-bubble{
-width:36px;
-height:36px;
-
-border-radius:var(--rsm);
-
-background:rgba(167,139,250,.12);
-
-color:var(--primary);
-
-display:flex;
-
-align-items:center;
-
-justify-content:center;
-
-flex-shrink:0
+  width:32px;
+  height:32px;
+  border-radius:var(--rsm);
+  background:rgba(167,139,250,.12);
+  color:var(--primary);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
 }
 
 .archive-name{
-font-size:13px;
-
-font-weight:700;
-
-white-space:nowrap;
-
-overflow:hidden;
-
-text-overflow:ellipsis;
-
-max-width:170px
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
 .archive-size{
-font-size:11px;
-
-color:var(--subtle);
-
-font-family:'JetBrains Mono',monospace
+  font-size:10px;
+  color:var(--subtle);
+  font-family:'JetBrains Mono',monospace;
 }
 
 .archive-actions{
-display:flex;
-
-align-items:center;
-
-gap:4px
+  display:flex;
+  align-items:center;
+  gap:2px;
 }
 
 .icon-btn-sm{
-background:none;
-
-border:none;
-
-color:var(--text);
-
-cursor:pointer;
-
-width:34px;
-
-height:34px;
-
-border-radius:var(--full);
-
-display:flex;
-
-align-items:center;
-
-justify-content:center
+  background:none;
+  border:none;
+  color:var(--text);
+  cursor:pointer;
+  width:36px;
+  height:36px;
+  border-radius:var(--full);
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
 .icon-btn-sm.delete{
-color:var(--error)
+  color:var(--error);
 }
 
 /* ================= STORAGE ================= */
 
 .storage-indicator-box{
-background:var(--container);
-
-border-radius:var(--rmd);
-
-padding:16px;
-
-display:flex;
-
-flex-direction:column;
-
-gap:10px;
-
-border:1px solid var(--outline)
+  background:var(--container);
+  border-radius:var(--rsm);
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  border:1px solid var(--outline);
 }
 
 .storage-meta-row{
-display:flex;
-
-justify-content:space-between;
-
-align-items:center
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
 }
 
 .storage-number{
-font-size:20px;
-
-font-weight:800;
-
-font-family:'JetBrains Mono',monospace;
-
-color:var(--primary)
+  font-size:18px;
+  font-weight:800;
+  font-family:'JetBrains Mono',monospace;
+  color:var(--primary);
 }
 
-/* ================= NAV ================= */
+/* ================= BOTTOM NAV ================= */
 
 .bottom-nav{
-position:absolute;
-
-bottom:0;
-
-left:0;
-
-right:0;
-
-height:calc(
-62px +
-env(safe-area-inset-bottom)
-);
-
-padding-bottom:env(safe-area-inset-bottom);
-
-background:var(--container);
-
-border-top:1px solid var(--outline);
-
-display:flex;
-
-justify-content:space-around;
-
-align-items:center;
-
-z-index:10
+  position:fixed;
+  bottom:0;
+  left:50%;
+  transform:translateX(-50%);
+  width:100%;
+  max-width:540px;
+  height:calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+  background:var(--container);
+  border-top:1px solid var(--outline);
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  z-index:100;
 }
 
 .nav-item{
-background:none;
-
-border:none;
-
-color:var(--subtle);
-
-display:flex;
-
-flex-direction:column;
-
-align-items:center;
-
-gap:3px;
-
-cursor:pointer;
-
-font-size:11px;
-
-font-weight:600;
-
-padding:6px 16px;
-
-border-radius:var(--full)
+  background:none;
+  border:none;
+  color:var(--subtle);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  cursor:pointer;
+  font-size:10.5px;
+  font-weight:600;
+  padding:6px 12px;
+  border-radius:var(--full);
+  flex:1;
+  max-width:110px;
 }
 
 .nav-item .material-symbols-rounded{
-font-size:22px;
-
-padding:2px 14px;
-
-border-radius:var(--full)
+  font-size:22px;
+  padding:3px 14px;
+  border-radius:var(--full);
+  transition:all .15s ease;
 }
 
 .nav-item.active{
-color:var(--text)
+  color:var(--text);
 }
 
 .nav-item.active .material-symbols-rounded{
-background:rgba(167,139,250,.18);
-
-color:var(--primary)
+  background:rgba(167,139,250,.2);
+  color:var(--primary);
 }
 
-/* ================= FALLBACK ================= */
+/* ================= DIRECT FALLBACK ================= */
 
 .direct-fallback{
-display:none;
-
-background:rgba(167,139,250,.08);
-
-border:1px solid rgba(167,139,250,.2);
-
-padding:12px;
-
-border-radius:var(--rmd);
-
-gap:8px;
-
-flex-direction:column
+  display:none;
+  background:rgba(167,139,250,.08);
+  border:1px solid rgba(167,139,250,.2);
+  padding:12px;
+  border-radius:var(--rsm);
+  gap:8px;
+  flex-direction:column;
 }
 
 .direct-fallback.show{
-display:flex
+  display:flex;
 }
 
 .direct-fallback small{
-color:var(--subtle);
-
-line-height:1.4
+  color:var(--subtle);
+  line-height:1.4;
+  font-size:11px;
 }
-
 </style>
 </head>
 
@@ -1157,694 +952,283 @@ line-height:1.4
 
 <div class="android-frame">
 
-<!-- ================= TOP BAR ================= -->
-
-<div class="top-app-bar">
-
-<div class="app-title">
-
-<div class="logo-icon">
-
-<span class="material-symbols-rounded">
-play_arrow
-</span>
-
-</div>
-
-Fluxplay
-
-</div>
-
-<span class="status-chip" id="statusChip">
-Ready
-</span>
-
-</div>
-
-<div class="content-scroll">
-
-<!-- ================= PLAYER ================= -->
-
-<div class="player-card" id="playerCard">
-
-<video
-id="video"
-playsinline
-webkit-playsinline
-preload="metadata"
-crossorigin="anonymous">
-</video>
-
-<div class="gesture-surface">
-
-<div
-class="touch-half"
-id="touchLeft">
-</div>
-
-<div
-class="touch-half"
-id="touchRight">
-</div>
-
-</div>
-
-<div class="player-empty">
-
-<span class="material-symbols-rounded">
-movie
-</span>
-
-<span style="font-size:13px;font-weight:500">
-Load a video link below
-</span>
-
-</div>
-
-<div
-class="spinner"
-id="spinner">
-
-<div class="spinner-ring">
-</div>
-
-</div>
-
-<div
-class="err-banner"
-id="errBanner">
-
-Unable to load video.
-Check the link or CORS policy.
-
-</div>
-
-<div
-class="skip-feedback left"
-id="animSkipLeft">
-
-<span class="material-symbols-rounded">
-replay_30
-</span>
-
-<span>-30s</span>
-
-</div>
-
-<div
-class="skip-feedback right"
-id="animSkipRight">
-
-<span class="material-symbols-rounded">
-forward_30
-</span>
-
-<span>+30s</span>
-
-</div>
-
-<div
-class="player-ui"
-id="playerUi">
-
-<div class="player-top-controls">
-
-<select
-class="md-select"
-id="subtitleSelect">
-
-<option value="off">
-Subtitles Off
-</option>
-
-</select>
-
-<select
-class="md-select"
-id="speedSelect">
-
-<option value=".75">
-0.75x
-</option>
-
-<option value="1"
-selected>
-1.0x
-</option>
-
-<option value="1.25">
-1.25x
-</option>
-
-<option value="1.5">
-1.5x
-</option>
-
-<option value="2">
-2.0x
-</option>
-
-</select>
-
-</div>
-
-<div class="center-controls">
-
-<button
-class="btn-circle"
-id="btnBack30">
-
-<span class="material-symbols-rounded">
-replay_30
-</span>
-
-</button>
-
-<button
-class="btn-circle play-btn"
-id="btnPlayCenter">
-
-<span
-class="material-symbols-rounded"
-id="playIcon">
-
-play_arrow
-
-</span>
-
-</button>
-
-<button
-class="btn-circle"
-id="btnFwd30">
-
-<span class="material-symbols-rounded">
-forward_30
-</span>
-
-</button>
-
-</div>
-
-<div class="bottom-controls">
-
-<div
-class="seek-slider-container"
-id="seekWrap">
-
-<div class="seek-track">
-
-<div
-class="seek-buffer"
-id="seekBuffer">
-</div>
-
-<div
-class="seek-fill"
-id="seekFill">
-</div>
-
-</div>
-
-<div
-class="seek-thumb"
-id="seekThumb">
-</div>
-
-</div>
-
-<div class="ctrl-bar">
-
-<span
-class="time-chip"
-id="timeLabel">
-
-0:00 / 0:00
-
-</span>
-
-<div class="ctrl-actions">
-
-<button
-class="icon-action"
-id="btnMute">
-
-<span
-class="material-symbols-rounded"
-id="muteIcon">
-
-volume_up
-
-</span>
-
-</button>
-
-<button
-class="icon-action"
-id="btnFs">
-
-<span
-class="material-symbols-rounded"
-id="fsIcon">
-
-fullscreen
-
-</span>
-
-</button>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<!-- ================= STREAM ================= -->
-
-<div
-class="md-card"
-id="streamPanel">
-
-<span class="card-label">
-Instant Video Stream
-</span>
-
-<input
-class="md-input"
-id="streamUrl"
-type="text"
-placeholder="https://example.com/video.mp4"
-inputmode="url"
-autocomplete="off">
-
-<button
-class="md-btn"
-id="btnStream">
-
-<span class="material-symbols-rounded">
-play_arrow
-</span>
-
-Play Stream
-
-</button>
-
-</div>
-
-<!-- ================= SUBTITLES ================= -->
-
-<div class="md-card">
-
-<span class="card-label">
-Subtitles
-</span>
-
-<div class="subtitle-info">
-
-Native subtitle tracks exposed by the source are detected automatically.
-You can also load an external WebVTT (.vtt) subtitle.
-
-</div>
-
-<div class="subtitle-row">
-
-<input
-class="md-input"
-id="subtitleUrl"
-type="url"
-placeholder="https://example.com/subtitles.vtt"
-inputmode="url"
-autocomplete="off">
-
-</div>
-
-<div class="subtitle-actions">
-
-<button
-class="md-btn"
-id="btnLoadSubtitle">
-
-<span class="material-symbols-rounded">
-subtitles
-</span>
-
-Load Subtitle
-
-</button>
-
-<button
-class="md-btn-secondary"
-id="btnDownloadSubtitle">
-
-<span class="material-symbols-rounded">
-download
-</span>
-
-Download
-
-</button>
-
-</div>
-
-<div
-class="subtitle-status"
-id="subtitleStatus">
-
-No external subtitle loaded.
-
-</div>
-
-</div>
-
-<!-- ================= ZIP ================= -->
-
-<div
-class="md-card"
-id="zipPanel"
-style="display:none">
-
-<div class="card-label">
-
-<span>
-Batch Files Input
-</span>
-
-<span
-class="count-pill"
-id="fileCountBadge">
-
-0 Files Available
-
-</span>
-
-</div>
-
-<textarea
-class="md-input"
-id="zipUrls"
-placeholder="Paste file links (one per line):&#10;https://example.com/file01.mp4&#10;https://example.com/file02.mp4"
-autocomplete="off">
-</textarea>
-
-<div style="display:flex;gap:8px">
-
-<input
-class="md-input"
-id="zipName"
-type="text"
-placeholder="Archive_Name"
-value="Files_Batch">
-
-<button
-class="md-btn"
-id="btnZipDownload">
-
-<span class="material-symbols-rounded">
-folder_zip
-</span>
-
-Download ZIP
-
-</button>
-
-</div>
-
-<div
-class="direct-fallback"
-id="directFallback">
-
-<strong>
-Browser download available
-</strong>
-
-<small>
-JavaScript cannot read this server response in this browser,
-so a ZIP cannot be created here. You can download the original
-file directly instead.
-</small>
-
-<button
-class="md-btn"
-id="btnDirectDownload">
-
-<span class="material-symbols-rounded">
-download
-</span>
-
-Direct Download
-
-</button>
-
-</div>
-
-<div
-class="telemetry-card"
-id="telemetryBox">
-
-<div class="telemetry-header">
-
-<div>
-
-<div
-class="telemetry-status"
-id="zipStatus">
-
-Connecting...
-
-</div>
-
-<div
-style="font-size:11px;color:var(--subtle)"
-id="zipFileProgressText">
-
-File 0 of 0
-
-</div>
-
-</div>
-
-<div
-style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-
-<div
-class="telemetry-percentage"
-id="zipPct">
-
-0%
-
-</div>
-
-<button
-class="md-btn-cancel"
-id="btnCancelDownload">
-
-<span
-class="material-symbols-rounded"
-style="font-size:14px">
-
-close
-
-</span>
-
-Cancel
-
-</button>
-
-</div>
-
-</div>
-
-<div class="progress-track">
-
-<div
-class="progress-fill"
-id="zipBar">
-</div>
-
-</div>
-
-<div class="telemetry-grid">
-
-<div class="stat-chip">
-
-<span class="stat-label">
-Downloaded / Size
-</span>
-
-<span
-class="stat-value"
-id="statSize">
-
-0 B / 0 B
-
-</span>
-
-</div>
-
-<div class="stat-chip">
-
-<span class="stat-label">
-Live Speed
-</span>
-
-<span
-class="stat-value"
-id="statSpeed">
-
-0 B/s
-
-</span>
-
-</div>
-
-</div>
-
-</div>
-
-<div
-id="archivesSection"
-style="display:none;flex-direction:column;gap:8px;margin-top:6px">
-
-<span
-class="card-label"
-style="font-size:11px">
-
-Saved on Disk (IndexedDB)
-
-</span>
-
-<div
-class="saved-archives"
-id="archivesList">
-</div>
-
-</div>
-
-</div>
-
-<!-- ================= SETTINGS ================= -->
-
-<div
-class="md-card"
-id="settingsPanel"
-style="display:none">
-
-<span class="card-label">
-App Storage & Cache
-</span>
-
-<div class="storage-indicator-box">
-
-<div class="storage-meta-row">
-
-<span
-style="font-size:13px;font-weight:600">
-
-IndexedDB Storage Usage
-
-</span>
-
-<span
-class="storage-number"
-id="storageUsageLabel">
-
-0 MB
-
-</span>
-
-</div>
-
-<div class="progress-track">
-
-<div
-class="progress-fill"
-id="storageBarFill">
-</div>
-
-</div>
-
-<span
-style="font-size:11px;color:var(--subtle)">
-
-Saved ZIP archives are stored in browser persistent storage.
-
-</span>
-
-</div>
-
-<button
-class="md-btn-danger"
-id="btnClearAllStorage">
-
-<span class="material-symbols-rounded">
-delete_sweep
-</span>
-
-Clear All Downloaded Data
-
-</button>
-
-</div>
-
-</div>
-
-<!-- ================= NAV ================= -->
-
-<div class="bottom-nav">
-
-<button
-class="nav-item active"
-id="navStream">
-
-<span class="material-symbols-rounded">
-play_circle
-</span>
-
-Player
-
-</button>
-
-<button
-class="nav-item"
-id="navZip">
-
-<span class="material-symbols-rounded">
-download_for_offline
-</span>
-
-Downloader
-
-</button>
-
-<button
-class="nav-item"
-id="navSettings">
-
-<span class="material-symbols-rounded">
-settings
-</span>
-
-Settings
-
-</button>
-
-</div>
+  <!-- ================= TOP BAR ================= -->
+  <div class="top-app-bar">
+    <div class="app-title">
+      <div class="logo-icon">
+        <span class="material-symbols-rounded">play_arrow</span>
+      </div>
+      Fluxplay
+    </div>
+    <span class="status-chip" id="statusChip">Ready</span>
+  </div>
+
+  <div class="content-scroll">
+
+    <!-- ================= PLAYER ================= -->
+    <div class="player-card" id="playerCard">
+      <video
+        id="video"
+        playsinline
+        webkit-playsinline
+        preload="metadata"
+        crossorigin="anonymous">
+      </video>
+
+      <div class="gesture-surface">
+        <div class="touch-half" id="touchLeft"></div>
+        <div class="touch-half" id="touchRight"></div>
+      </div>
+
+      <div class="player-empty">
+        <span class="material-symbols-rounded">movie</span>
+        <span style="font-size:12px;font-weight:500">Load a video link below</span>
+      </div>
+
+      <div class="spinner" id="spinner">
+        <div class="spinner-ring"></div>
+      </div>
+
+      <div class="err-banner" id="errBanner">
+        Unable to load video. Check the link or CORS policy.
+      </div>
+
+      <div class="skip-feedback left" id="animSkipLeft">
+        <span class="material-symbols-rounded">replay_30</span>
+        <span>-30s</span>
+      </div>
+
+      <div class="skip-feedback right" id="animSkipRight">
+        <span class="material-symbols-rounded">forward_30</span>
+        <span>+30s</span>
+      </div>
+
+      <div class="player-ui" id="playerUi">
+        <div class="player-top-controls">
+          <!-- CC Toggle Button -->
+          <button class="cc-btn" id="btnCc" aria-label="Toggle Subtitles">
+            <span class="material-symbols-rounded" id="ccIcon">closed_caption_off</span>
+          </button>
+
+          <!-- Playback Speed -->
+          <select class="md-select" id="speedSelect">
+            <option value=".75">0.75x</option>
+            <option value="1" selected>1.0x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+        </div>
+
+        <div class="center-controls">
+          <button class="btn-circle" id="btnBack30" aria-label="Rewind 30 seconds">
+            <span class="material-symbols-rounded">replay_30</span>
+          </button>
+          <button class="btn-circle play-btn" id="btnPlayCenter" aria-label="Play or pause">
+            <span class="material-symbols-rounded" id="playIcon">play_arrow</span>
+          </button>
+          <button class="btn-circle" id="btnFwd30" aria-label="Forward 30 seconds">
+            <span class="material-symbols-rounded">forward_30</span>
+          </button>
+        </div>
+
+        <div class="bottom-controls">
+          <div class="seek-slider-container" id="seekWrap">
+            <div class="seek-track">
+              <div class="seek-buffer" id="seekBuffer"></div>
+              <div class="seek-fill" id="seekFill"></div>
+            </div>
+            <div class="seek-thumb" id="seekThumb"></div>
+          </div>
+
+          <div class="ctrl-bar">
+            <span class="time-chip" id="timeLabel">0:00 / 0:00</span>
+            <div class="ctrl-actions">
+              <button class="icon-action" id="btnMute" aria-label="Mute toggle">
+                <span class="material-symbols-rounded" id="muteIcon">volume_up</span>
+              </button>
+              <button class="icon-action" id="btnFs" aria-label="Fullscreen toggle">
+                <span class="material-symbols-rounded" id="fsIcon">fullscreen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= STREAM ================= -->
+    <div class="md-card" id="streamPanel">
+      <span class="card-label">Instant Video Stream</span>
+      <input
+        class="md-input"
+        id="streamUrl"
+        type="url"
+        placeholder="https://example.com/video.mp4"
+        inputmode="url"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false">
+      <button class="md-btn" id="btnStream">
+        <span class="material-symbols-rounded">play_arrow</span>
+        Play Stream
+      </button>
+    </div>
+
+    <!-- ================= SUBTITLES ================= -->
+    <div class="md-card">
+      <span class="card-label">Subtitles</span>
+      <div class="subtitle-info">
+        Native tracks from sources are auto-detected. You can also load an external WebVTT (.vtt) file and toggle it using the <strong>CC</strong> button in the player.
+      </div>
+      <div class="subtitle-row">
+        <input
+          class="md-input"
+          id="subtitleUrl"
+          type="url"
+          placeholder="https://example.com/subtitles.vtt"
+          inputmode="url"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false">
+      </div>
+      <div class="subtitle-actions">
+        <button class="md-btn" id="btnLoadSubtitle">
+          <span class="material-symbols-rounded">subtitles</span>
+          Load VTT
+        </button>
+        <button class="md-btn-secondary" id="btnDownloadSubtitle">
+          <span class="material-symbols-rounded">download</span>
+          Download
+        </button>
+      </div>
+      <div class="subtitle-status" id="subtitleStatus">No subtitle loaded.</div>
+    </div>
+
+    <!-- ================= ZIP ================= -->
+    <div class="md-card" id="zipPanel" style="display:none">
+      <div class="card-label">
+        <span>Batch Files Input</span>
+        <span class="count-pill" id="fileCountBadge">0 Files Available</span>
+      </div>
+
+      <textarea
+        class="md-input"
+        id="zipUrls"
+        placeholder="Paste file links (one per line):&#10;https://example.com/file01.mp4&#10;https://example.com/file02.mp4"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"></textarea>
+
+      <div class="input-btn-group">
+        <input
+          class="md-input"
+          id="zipName"
+          type="text"
+          placeholder="Archive_Name"
+          value="Files_Batch"
+          style="flex:1">
+        <button class="md-btn" id="btnZipDownload">
+          <span class="material-symbols-rounded">folder_zip</span>
+          Download ZIP
+        </button>
+      </div>
+
+      <div class="direct-fallback" id="directFallback">
+        <strong>Browser download available</strong>
+        <small>JavaScript cannot read this server response directly due to CORS. You can download the original file directly instead.</small>
+        <button class="md-btn" id="btnDirectDownload">
+          <span class="material-symbols-rounded">download</span>
+          Direct Download
+        </button>
+      </div>
+
+      <div class="telemetry-card" id="telemetryBox">
+        <div class="telemetry-header">
+          <div>
+            <div class="telemetry-status" id="zipStatus">Connecting...</div>
+            <div style="font-size:11px;color:var(--subtle)" id="zipFileProgressText">File 0 of 0</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+            <div class="telemetry-percentage" id="zipPct">0%</div>
+            <button class="md-btn-cancel" id="btnCancelDownload">
+              <span class="material-symbols-rounded" style="font-size:14px">close</span>
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <div class="progress-track">
+          <div class="progress-fill" id="zipBar"></div>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="stat-chip">
+            <span class="stat-label">Downloaded / Size</span>
+            <span class="stat-value" id="statSize">0 B / 0 B</span>
+          </div>
+          <div class="stat-chip">
+            <span class="stat-label">Live Speed</span>
+            <span class="stat-value" id="statSpeed">0 B/s</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="archivesSection" style="display:none;flex-direction:column;gap:8px;margin-top:6px">
+        <span class="card-label" style="font-size:11px">Saved on Disk (IndexedDB)</span>
+        <div class="saved-archives" id="archivesList"></div>
+      </div>
+    </div>
+
+    <!-- ================= SETTINGS ================= -->
+    <div class="md-card" id="settingsPanel" style="display:none">
+      <span class="card-label">App Storage & Cache</span>
+      <div class="storage-indicator-box">
+        <div class="storage-meta-row">
+          <span style="font-size:12.5px;font-weight:600">IndexedDB Storage Usage</span>
+          <span class="storage-number" id="storageUsageLabel">0 MB</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" id="storageBarFill"></div>
+        </div>
+        <span style="font-size:11px;color:var(--subtle)">Saved ZIP archives are stored in browser persistent storage.</span>
+      </div>
+
+      <button class="md-btn-danger" id="btnClearAllStorage">
+        <span class="material-symbols-rounded">delete_sweep</span>
+        Clear All Downloaded Data
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ================= BOTTOM NAV ================= -->
+  <div class="bottom-nav">
+    <button class="nav-item active" id="navStream">
+      <span class="material-symbols-rounded">play_circle</span>
+      Player
+    </button>
+    <button class="nav-item" id="navZip">
+      <span class="material-symbols-rounded">download_for_offline</span>
+      Downloader
+    </button>
+    <button class="nav-item" id="navSettings">
+      <span class="material-symbols-rounded">settings</span>
+      Settings
+    </button>
+  </div>
 
 </div>
 
 <script>
 (function(){
-
 "use strict";
 
 const $=id=>document.getElementById(id);
 
 /* ================= ELEMENTS ================= */
-
 const video=$("video");
 const playerCard=$("playerCard");
 const statusChip=$("statusChip");
@@ -1868,7 +1252,8 @@ const fsIcon=$("fsIcon");
 
 const speedSelect=$("speedSelect");
 
-const subtitleSelect=$("subtitleSelect");
+const btnCc=$("btnCc");
+const ccIcon=$("ccIcon");
 const subtitleUrl=$("subtitleUrl");
 const btnLoadSubtitle=$("btnLoadSubtitle");
 const btnDownloadSubtitle=$("btnDownloadSubtitle");
@@ -1920,2050 +1305,814 @@ const directFallback=$("directFallback");
 const btnDirectDownload=$("btnDirectDownload");
 
 /* ================= STATE ================= */
-
 let uiTimer=null;
 let isScrubbing=false;
 let wasPlaying=false;
 let currentAbortController=null;
 let externalSubtitleTrack=null;
+let isCcActive=false;
+let activeTrackIndex=0;
 
 /* ================= HELPERS ================= */
-
 function setStatus(text,type="default"){
-
-statusChip.textContent=text;
-
-statusChip.className=
-"status-chip"+
-(
-type==="live"
-?" live"
-:
-type==="canceled"
-?" canceled"
-:""
-);
-
+  statusChip.textContent=text;
+  statusChip.className="status-chip"+(type==="live"?" live":type==="canceled"?" canceled":"");
 }
 
 function fmtTime(sec){
-
-if(!Number.isFinite(sec)||sec<0){
-return"0:00";
-}
-
-return Math.floor(sec/60)+":"+
-String(
-Math.floor(sec%60)
-).padStart(2,"0");
-
+  if(!Number.isFinite(sec)||sec<0) return "0:00";
+  return Math.floor(sec/60)+":"+String(Math.floor(sec%60)).padStart(2,"0");
 }
 
 function formatBytes(bytes){
-
-if(!Number.isFinite(bytes)||bytes<=0){
-return"0 B";
-}
-
-const units=[
-"B","KB","MB","GB","TB"
-];
-
-const i=Math.min(
-Math.floor(
-Math.log(bytes)/Math.log(1024)
-),
-units.length-1
-);
-
-return(
-bytes/
-Math.pow(1024,i)
-).toFixed(i?1:0)+
-" "+
-units[i];
-
+  if(!Number.isFinite(bytes)||bytes<=0) return "0 B";
+  const units=["B","KB","MB","GB","TB"];
+  const i=Math.min(Math.floor(Math.log(bytes)/Math.log(1024)),units.length-1);
+  return (bytes/Math.pow(1024,i)).toFixed(i?1:0)+" "+units[i];
 }
 
 function getFilename(url,index=0){
-
-try{
-
-const u=new URL(url);
-const path=u.pathname||"";
-
-let name=
-decodeURIComponent(
-path.substring(
-path.lastIndexOf("/")+1
-)
-).trim();
-
-if(name&&name!=="."&&name!==".."){
-
-return name.replace(
-/[<>:"/\\|?*\x00-\x1F]/g,
-"_"
-);
-
-}
-
-}catch(e){}
-
-return"File_"+
-String(index+1).padStart(2,"0");
-
+  try{
+    const u=new URL(url);
+    const path=u.pathname||"";
+    let name=decodeURIComponent(path.substring(path.lastIndexOf("/")+1)).trim();
+    if(name&&name!=="."&&name!==".."){
+      return name.replace(/[<>:"/\\|?*\x00-\x1F]/g,"_");
+    }
+  }catch(e){}
+  return "File_"+String(index+1).padStart(2,"0");
 }
 
 function showUI(){
-
-playerCard.classList.remove(
-"hide-ui"
-);
-
-clearTimeout(uiTimer);
-
-uiTimer=setTimeout(()=>{
-
-if(!video.paused&&!isScrubbing){
-
-playerCard.classList.add(
-"hide-ui"
-);
-
-}
-
-},3000);
-
+  playerCard.classList.remove("hide-ui");
+  clearTimeout(uiTimer);
+  uiTimer=setTimeout(()=>{
+    if(!video.paused&&!isScrubbing){
+      playerCard.classList.add("hide-ui");
+    }
+  },3000);
 }
 
 /* ================= TABS ================= */
-
 function switchTab(btn,panel){
-
-[
-navStream,
-navZip,
-navSettings
-].forEach(
-x=>x.classList.remove("active")
-);
-
-[
-streamPanel,
-zipPanel,
-settingsPanel
-].forEach(
-x=>x.style.display="none"
-);
-
-btn.classList.add("active");
-
-panel.style.display="flex";
-
-if(panel===settingsPanel){
-
-refreshStorageTelemetry();
-
+  [navStream,navZip,navSettings].forEach(x=>x.classList.remove("active"));
+  [streamPanel,zipPanel,settingsPanel].forEach(x=>x.style.display="none");
+  btn.classList.add("active");
+  panel.style.display="flex";
+  if(panel===settingsPanel){
+    refreshStorageTelemetry();
+  }
 }
 
+navStream.onclick=()=>switchTab(navStream,streamPanel);
+navZip.onclick=()=>switchTab(navZip,zipPanel);
+navSettings.onclick=()=>switchTab(navSettings,settingsPanel);
+
+/* ================= CC / SUBTITLES ================= */
+function disableAllSubtitleTracks(){
+  const tracks=video.textTracks;
+  if(tracks){
+    for(let i=0;i<tracks.length;i++){
+      tracks[i].mode="disabled";
+    }
+  }
+  if(externalSubtitleTrack){
+    externalSubtitleTrack.mode="disabled";
+  }
 }
 
-navStream.onclick=()=>{
-switchTab(navStream,streamPanel);
-};
+function enableActiveSubtitle(){
+  disableAllSubtitleTracks();
 
-navZip.onclick=()=>{
-switchTab(navZip,zipPanel);
-};
+  if(externalSubtitleTrack){
+    externalSubtitleTrack.mode="showing";
+    subtitleStatus.textContent="External subtitle active.";
+    return;
+  }
 
-navSettings.onclick=()=>{
-switchTab(navSettings,settingsPanel);
-};
+  const tracks=video.textTracks;
+  if(tracks&&tracks.length>0){
+    const track=tracks[activeTrackIndex]||tracks[0];
+    track.mode="showing";
+    subtitleStatus.textContent="Subtitle: "+(track.label||track.language||"Track "+(activeTrackIndex+1));
+  }
+}
 
-/* ================= SUBTITLES ================= */
+function toggleCc(){
+  const hasTracks=(video.textTracks&&video.textTracks.length>0)||externalSubtitleTrack;
+
+  if(!hasTracks){
+    subtitleStatus.textContent="No subtitles available for this video.";
+    return;
+  }
+
+  isCcActive=!isCcActive;
+
+  if(isCcActive){
+    enableActiveSubtitle();
+    btnCc.classList.add("active");
+    ccIcon.textContent="closed_caption";
+  }else{
+    disableAllSubtitleTracks();
+    btnCc.classList.remove("active");
+    ccIcon.textContent="closed_caption_off";
+    subtitleStatus.textContent="Subtitles disabled.";
+  }
+
+  showUI();
+}
+
+btnCc.onclick=e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  toggleCc();
+};
 
 function refreshSubtitleTracks(){
+  const count=(video.textTracks?video.textTracks.length:0)+(externalSubtitleTrack?1:0);
+  subtitleStatus.textContent=count+" subtitle track"+(count===1?"":"s")+" detected.";
 
-subtitleSelect.innerHTML="";
-
-const off=document.createElement("option");
-
-off.value="off";
-off.textContent="Subtitles Off";
-
-subtitleSelect.appendChild(off);
-
-const tracks=video.textTracks;
-
-let found=0;
-
-if(tracks){
-
-for(
-let i=0;
-i<tracks.length;
-i++
-){
-
-const track=tracks[i];
-
-const option=
-document.createElement("option");
-
-option.value="native:"+i;
-
-option.textContent=
-track.label||
-track.language||
-"Subtitle "+(i+1);
-
-subtitleSelect.appendChild(option);
-
-found++;
-
+  if(isCcActive&&count>0){
+    enableActiveSubtitle();
+  }
 }
-
-}
-
-if(externalSubtitleTrack){
-
-const option=
-document.createElement("option");
-
-option.value="external";
-
-option.textContent=
-"External Subtitle";
-
-subtitleSelect.appendChild(option);
-
-}
-
-subtitleSelect.value="off";
-
-subtitleStatus.textContent=
-found+
-" native subtitle track"+
-(found===1?"":"s")+
-" detected.";
-
-}
-
-function disableAllSubtitleTracks(){
-
-const tracks=video.textTracks;
-
-if(tracks){
-
-for(
-let i=0;
-i<tracks.length;
-i++
-){
-
-tracks[i].mode="disabled";
-
-}
-
-}
-
-if(externalSubtitleTrack){
-
-externalSubtitleTrack.mode="disabled";
-
-}
-
-}
-
-function selectSubtitle(value){
-
-disableAllSubtitleTracks();
-
-if(value==="off"){
-
-subtitleStatus.textContent=
-"Subtitles disabled.";
-
-return;
-
-}
-
-if(value==="external"){
-
-if(externalSubtitleTrack){
-
-externalSubtitleTrack.mode="showing";
-
-subtitleStatus.textContent=
-"External subtitle active.";
-
-}
-
-return;
-
-}
-
-if(value.startsWith("native:")){
-
-const index=
-Number(
-value.substring(7)
-);
-
-const track=
-video.textTracks[index];
-
-if(track){
-
-track.mode="showing";
-
-subtitleStatus.textContent=
-"Subtitle: "+
-(
-track.label||
-track.language||
-"Track "+(index+1)
-);
-
-}
-
-}
-
-}
-
-subtitleSelect.onchange=()=>{
-
-selectSubtitle(
-subtitleSelect.value
-);
-
-showUI();
-
-};
 
 function loadExternalSubtitle(url){
+  url=String(url||"").trim();
+  if(!url){
+    alert("Enter a .vtt subtitle URL.");
+    return;
+  }
 
-url=String(url||"").trim();
+  if(externalSubtitleTrack){
+    try{ externalSubtitleTrack.mode="disabled"; }catch(e){}
+    externalSubtitleTrack=null;
+  }
 
-if(!url){
+  const old=video.querySelector('track[data-fluxplay-external="1"]');
+  if(old) old.remove();
 
-alert(
-"Enter a .vtt subtitle URL."
-);
+  const track=document.createElement("track");
+  track.kind="subtitles";
+  track.label="External Subtitle";
+  track.srclang="en";
+  track.src=url;
+  track.default=true;
+  track.dataset.fluxplayExternal="1";
 
-return;
+  video.appendChild(track);
+  externalSubtitleTrack=track.track;
 
+  track.addEventListener("load",()=>{
+    isCcActive=true;
+    btnCc.classList.add("active");
+    ccIcon.textContent="closed_caption";
+    enableActiveSubtitle();
+    subtitleStatus.textContent="External WebVTT subtitle loaded & active.";
+  },{once:true});
+
+  track.addEventListener("error",()=>{
+    subtitleStatus.textContent="Unable to load subtitle. Check VTT URL or CORS.";
+  });
+
+  subtitleStatus.textContent="Loading subtitle…";
 }
 
-if(externalSubtitleTrack){
-
-try{
-externalSubtitleTrack.mode="disabled";
-}catch(e){}
-
-externalSubtitleTrack=null;
-
-}
-
-const old=
-video.querySelector(
-'track[data-fluxplay-external="1"]'
-);
-
-if(old){
-old.remove();
-}
-
-const track=
-document.createElement("track");
-
-track.kind="subtitles";
-track.label="External Subtitle";
-track.srclang="en";
-track.src=url;
-track.default=false;
-
-track.dataset.fluxplayExternal="1";
-
-video.appendChild(track);
-
-externalSubtitleTrack=track.track;
-
-track.addEventListener(
-"load",
-()=>{
-
-refreshSubtitleTracks();
-
-subtitleSelect.value="external";
-
-selectSubtitle("external");
-
-subtitleStatus.textContent=
-"External WebVTT subtitle loaded.";
-
-},
-{once:true}
-);
-
-track.addEventListener(
-"error",
-()=>{
-
-subtitleStatus.textContent=
-"Unable to load subtitle. Check the VTT URL or CORS policy.";
-
-}
-);
-
-subtitleStatus.textContent=
-"Loading subtitle…";
-
-}
-
-btnLoadSubtitle.onclick=()=>{
-
-loadExternalSubtitle(
-subtitleUrl.value
-);
-
-};
+btnLoadSubtitle.onclick=()=>loadExternalSubtitle(subtitleUrl.value);
 
 btnDownloadSubtitle.onclick=()=>{
-
-const url=
-subtitleUrl.value.trim();
-
-if(!url){
-
-alert(
-"Enter an external subtitle URL first."
-);
-
-return;
-
-}
-
-try{
-
-const a=document.createElement("a");
-
-a.href=url;
-a.target="_blank";
-a.rel="noopener";
-
-document.body.appendChild(a);
-
-a.click();
-
-a.remove();
-
-}catch(e){
-
-window.open(
-url,
-"_blank",
-"noopener"
-);
-
-}
-
+  const url=subtitleUrl.value.trim();
+  if(!url){
+    alert("Enter an external subtitle URL first.");
+    return;
+  }
+  try{
+    const a=document.createElement("a");
+    a.href=url;
+    a.target="_blank";
+    a.rel="noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }catch(e){
+    window.open(url,"_blank","noopener");
+  }
 };
 
 /* ================= VIDEO SOURCE ================= */
-
 function playSource(url){
+  url=String(url||"").trim();
+  if(!url) return;
+  errBanner.classList.remove("show");
+  playerCard.classList.add("has-src");
+  spinner.classList.add("show");
+  setStatus("Loading…");
 
-url=String(url||"").trim();
+  video.pause();
+  video.removeAttribute("src");
+  video.load();
+  video.src=url;
+  video.load();
 
-if(!url)return;
-
-errBanner.classList.remove("show");
-
-playerCard.classList.add("has-src");
-
-spinner.classList.add("show");
-
-setStatus("Loading…");
-
-video.pause();
-
-video.removeAttribute("src");
-
-video.load();
-
-video.src=url;
-
-video.load();
-
-video.play()
-.then(()=>{
-setStatus("Playing","live");
-})
-.catch(()=>{
-setStatus("Ready");
-});
-
+  video.play()
+    .then(()=>setStatus("Playing","live"))
+    .catch(()=>setStatus("Ready"));
 }
 
-btnStream.onclick=()=>{
-playSource(streamUrl.value);
-};
-
-streamUrl.addEventListener(
-"keydown",
-e=>{
-if(e.key==="Enter"){
-btnStream.click();
-}
+btnStream.onclick=()=>playSource(streamUrl.value);
+streamUrl.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    btnStream.click();
+    streamUrl.blur();
+  }
 });
 
-/* ================= PLAY ================= */
-
+/* ================= PLAY / SKIP ================= */
 function togglePlay(){
-
-if(!video.src)return;
-
-if(video.paused){
-
-video.play().catch(()=>{});
-
-}else{
-
-video.pause();
-
+  if(!video.src) return;
+  if(video.paused){
+    video.play().catch(()=>{});
+  }else{
+    video.pause();
+  }
+  showUI();
 }
-
-showUI();
-
-}
-
-/* ================= SKIP 30 ================= */
 
 function doSkip(seconds){
-
-if(
-!video.src||
-!Number.isFinite(video.duration)||
-video.duration<=0
-){
-
-return false;
-
-}
-
-try{
-
-const current=
-Number.isFinite(video.currentTime)
-?video.currentTime
-:0;
-
-const target=Math.max(
-0,
-Math.min(
-video.duration,
-current+seconds
-)
-);
-
-video.currentTime=target;
-
-updateSeekUI();
-
-return true;
-
-}catch(e){
-
-console.warn(
-"Skip failed:",
-e
-);
-
-return false;
-
-}
-
+  if(!video.src||!Number.isFinite(video.duration)||video.duration<=0) return false;
+  try{
+    const current=Number.isFinite(video.currentTime)?video.currentTime:0;
+    const target=Math.max(0,Math.min(video.duration,current+seconds));
+    video.currentTime=target;
+    updateSeekUI();
+    return true;
+  }catch(e){
+    return false;
+  }
 }
 
 function showSkip(el){
-
-el.classList.remove("show");
-
-void el.offsetWidth;
-
-el.classList.add("show");
-
-clearTimeout(el._timer);
-
-el._timer=setTimeout(
-()=>{
-el.classList.remove("show");
-},
-500
-);
-
+  el.classList.remove("show");
+  void el.offsetWidth;
+  el.classList.add("show");
+  clearTimeout(el._timer);
+  el._timer=setTimeout(()=>el.classList.remove("show"),500);
 }
 
-/* ================= PLAYER BUTTONS ================= */
-
 btnPlayCenter.onclick=e=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-togglePlay();
-
+  e.preventDefault();
+  e.stopPropagation();
+  togglePlay();
 };
 
 btnBack30.onclick=e=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-if(doSkip(-30)){
-
-showSkip(animSkipLeft);
-
-showUI();
-
-}
-
+  e.preventDefault();
+  e.stopPropagation();
+  if(doSkip(-30)){
+    showSkip(animSkipLeft);
+    showUI();
+  }
 };
 
 btnFwd30.onclick=e=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-if(doSkip(30)){
-
-showSkip(animSkipRight);
-
-showUI();
-
-}
-
+  e.preventDefault();
+  e.stopPropagation();
+  if(doSkip(30)){
+    showSkip(animSkipRight);
+    showUI();
+  }
 };
 
-/* ================= DOUBLE TAP 30 ================= */
-
+/* ================= TOUCH & DOUBLE TAP ================= */
 function installDoubleTap(el,side){
+  let lastTap=0;
+  let tapTimer=null;
 
-let lastTap=0;
-let tapTimer=null;
+  el.addEventListener("pointerup",e=>{
+    if(e.pointerType==="mouse"&&e.button!==0) return;
+    e.preventDefault();
+    e.stopPropagation();
 
-el.addEventListener(
-"pointerup",
-e=>{
+    const now=performance.now();
+    if(now-lastTap<350){
+      clearTimeout(tapTimer);
+      tapTimer=null;
+      lastTap=0;
+      const amount=side==="left"?-30:30;
+      if(doSkip(amount)){
+        showSkip(side==="left"?animSkipLeft:animSkipRight);
+        showUI();
+      }
+      return;
+    }
 
-if(
-e.pointerType==="mouse"&&
-e.button!==0
-){
-return;
+    lastTap=now;
+    clearTimeout(tapTimer);
+    tapTimer=setTimeout(()=>{
+      lastTap=0;
+      tapTimer=null;
+      showUI();
+    },350);
+  },{passive:false});
 }
 
-e.preventDefault();
-e.stopPropagation();
-
-const now=performance.now();
-
-if(now-lastTap<350){
-
-clearTimeout(tapTimer);
-
-tapTimer=null;
-lastTap=0;
-
-const amount=
-side==="left"
-?-30
-:30;
-
-if(doSkip(amount)){
-
-showSkip(
-side==="left"
-?animSkipLeft
-:animSkipRight
-);
-
-showUI();
-
-}
-
-return;
-
-}
-
-lastTap=now;
-
-clearTimeout(tapTimer);
-
-tapTimer=setTimeout(
-()=>{
-
-lastTap=0;
-tapTimer=null;
-
-showUI();
-
-},
-350
-);
-
-},
-{
-passive:false
-}
-);
-
-}
-
-installDoubleTap(
-touchLeft,
-"left"
-);
-
-installDoubleTap(
-touchRight,
-"right"
-);
+installDoubleTap(touchLeft,"left");
+installDoubleTap(touchRight,"right");
 
 /* ================= SEEK ================= */
-
 function updateSeekUI(){
+  const d=video.duration;
+  if(!Number.isFinite(d)||d<=0) return;
+  const pct=Math.max(0,Math.min(100,video.currentTime/d*100));
+  seekFill.style.width=pct+"%";
+  seekThumb.style.left=pct+"%";
+  timeLabel.textContent=fmtTime(video.currentTime)+" / "+fmtTime(d);
 
-const d=video.duration;
-
-if(!Number.isFinite(d)||d<=0){
-return;
-}
-
-const pct=Math.max(
-0,
-Math.min(
-100,
-video.currentTime/d*100
-)
-);
-
-seekFill.style.width=pct+"%";
-
-seekThumb.style.left=pct+"%";
-
-timeLabel.textContent=
-fmtTime(video.currentTime)+
-" / "+
-fmtTime(d);
-
-try{
-
-if(video.buffered.length){
-
-const end=
-video.buffered.end(
-video.buffered.length-1
-);
-
-seekBuffer.style.width=
-Math.min(
-100,
-end/d*100
-)+"%";
-
-}
-
-}catch(e){}
-
+  try{
+    if(video.buffered.length){
+      const end=video.buffered.end(video.buffered.length-1);
+      seekBuffer.style.width=Math.min(100,end/d*100)+"%";
+    }
+  }catch(e){}
 }
 
 function seekTo(clientX){
-
-const r=
-seekWrap.getBoundingClientRect();
-
-const pct=Math.max(
-0,
-Math.min(
-1,
-(clientX-r.left)/r.width
-)
-);
-
-if(
-Number.isFinite(video.duration)&&
-video.duration>0
-){
-
-video.currentTime=
-pct*video.duration;
-
-updateSeekUI();
-
+  const r=seekWrap.getBoundingClientRect();
+  const pct=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
+  if(Number.isFinite(video.duration)&&video.duration>0){
+    video.currentTime=pct*video.duration;
+    updateSeekUI();
+  }
 }
 
-}
+seekWrap.addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  if(!Number.isFinite(video.duration)) return;
+  isScrubbing=true;
+  wasPlaying=!video.paused;
+  video.pause();
+  seekTo(e.clientX);
+  showUI();
 
-seekWrap.addEventListener(
-"pointerdown",
-e=>{
+  const move=e2=>seekTo(e2.clientX);
+  const up=()=>{
+    isScrubbing=false;
+    window.removeEventListener("pointermove",move);
+    window.removeEventListener("pointerup",up);
+    if(wasPlaying) video.play().catch(()=>{});
+    showUI();
+  };
 
-e.preventDefault();
-e.stopPropagation();
+  window.addEventListener("pointermove",move);
+  window.addEventListener("pointerup",up);
+});
 
-if(!Number.isFinite(video.duration)){
-return;
-}
-
-isScrubbing=true;
-
-wasPlaying=!video.paused;
-
-video.pause();
-
-seekTo(e.clientX);
-
-showUI();
-
-const move=e2=>{
-seekTo(e2.clientX);
-};
-
-const up=()=>{
-
-isScrubbing=false;
-
-window.removeEventListener(
-"pointermove",
-move
-);
-
-window.removeEventListener(
-"pointerup",
-up
-);
-
-if(wasPlaying){
-video.play().catch(()=>{});
-}
-
-showUI();
-
-};
-
-window.addEventListener(
-"pointermove",
-move
-);
-
-window.addEventListener(
-"pointerup",
-up
-);
-
-}
-);
-
-/* ================= MUTE ================= */
-
+/* ================= AUDIO & SPEED ================= */
 btnMute.onclick=e=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-video.muted=!video.muted;
-
-muteIcon.textContent=
-video.muted
-?"volume_off"
-:"volume_up";
-
-showUI();
-
+  e.preventDefault();
+  e.stopPropagation();
+  video.muted=!video.muted;
+  muteIcon.textContent=video.muted?"volume_off":"volume_up";
+  showUI();
 };
-
-/* ================= SPEED ================= */
 
 speedSelect.onchange=e=>{
-
-e.stopPropagation();
-
-video.playbackRate=
-Number(speedSelect.value)||1;
-
+  e.stopPropagation();
+  video.playbackRate=Number(speedSelect.value)||1;
 };
 
 /* ================= FULLSCREEN ================= */
-
 async function enterFullscreen(){
-
-try{
-
-/*
-If real fullscreen is currently active,
-exit it.
-*/
-
-if(document.fullscreenElement){
-
-await document.exitFullscreen();
-
-return;
-
-}
-
-/*
-Use the real Fullscreen API when available.
-*/
-
-if(
-playerCard.requestFullscreen
-){
-
-await playerCard.requestFullscreen();
-
-return;
-
-}
-
-/*
-Android WebView fallback.
-*/
-
-playerCard.classList.add("fakefs");
-
-fsIcon.textContent=
-"fullscreen_exit";
-
-showUI();
-
-}catch(e){
-
-console.warn(
-"Fullscreen API failed:",
-e
-);
-
-/*
-Fallback if the WebView/browser
-rejects the Fullscreen API.
-*/
-
-playerCard.classList.add("fakefs");
-
-fsIcon.textContent=
-"fullscreen_exit";
-
-showUI();
-
-}
-
+  try{
+    if(document.fullscreenElement){
+      await document.exitFullscreen();
+      return;
+    }
+    if(playerCard.requestFullscreen){
+      await playerCard.requestFullscreen();
+      return;
+    }
+    playerCard.classList.add("fakefs");
+    fsIcon.textContent="fullscreen_exit";
+    showUI();
+  }catch(e){
+    playerCard.classList.add("fakefs");
+    fsIcon.textContent="fullscreen_exit";
+    showUI();
+  }
 }
 
 btnFs.onclick=async e=>{
-
-e.preventDefault();
-e.stopPropagation();
-
-await enterFullscreen();
-
+  e.preventDefault();
+  e.stopPropagation();
+  await enterFullscreen();
 };
 
-document.addEventListener(
-"fullscreenchange",
-()=>{
+document.addEventListener("fullscreenchange",()=>{
+  const fullscreen=!!document.fullscreenElement;
+  fsIcon.textContent=fullscreen?"fullscreen_exit":"fullscreen";
+  playerCard.classList.remove("fakefs");
+});
 
-const fullscreen=
-!!document.fullscreenElement;
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&!document.fullscreenElement){
+    playerCard.classList.remove("fakefs");
+    fsIcon.textContent="fullscreen";
+  }
+});
 
-if(fullscreen){
+/* ================= VIDEO EVENT HANDLERS ================= */
+video.addEventListener("play",()=>{
+  playIcon.textContent="pause";
+  setStatus("Playing","live");
+  showUI();
+});
 
-fsIcon.textContent=
-"fullscreen_exit";
+video.addEventListener("pause",()=>{
+  playIcon.textContent="play_arrow";
+  setStatus("Paused");
+  showUI();
+});
 
-playerCard.classList.remove(
-"fakefs"
-);
-
-}else{
-
-fsIcon.textContent=
-"fullscreen";
-
-playerCard.classList.remove(
-"fakefs"
-);
-
-}
-
-}
-);
-
-/*
-Android back/fullscreen situations can sometimes
-leave the fallback active.
-*/
-
-document.addEventListener(
-"keydown",
-e=>{
-
-if(e.key==="Escape"){
-
-if(!document.fullscreenElement){
-
-playerCard.classList.remove(
-"fakefs"
-);
-
-fsIcon.textContent=
-"fullscreen";
-
-}
-
-}
-
-}
-);
-
-/* ================= VIDEO EVENTS ================= */
-
-video.addEventListener(
-"play",
-()=>{
-
-playIcon.textContent="pause";
-
-setStatus(
-"Playing",
-"live"
-);
-
-showUI();
-
-}
-);
-
-video.addEventListener(
-"pause",
-()=>{
-
-playIcon.textContent="play_arrow";
-
-setStatus("Paused");
-
-showUI();
-
-}
-);
-
-video.addEventListener(
-"timeupdate",
-updateSeekUI
-);
-
-video.addEventListener(
-"loadedmetadata",
-()=>{
-
-spinner.classList.remove(
-"show"
-);
-
-updateSeekUI();
-
-setTimeout(
-refreshSubtitleTracks,
-150
-);
-
-}
-);
-
-video.addEventListener(
-"durationchange",
-updateSeekUI
-);
-
-video.addEventListener(
-"waiting",
-()=>{
-
-spinner.classList.add("show");
-
-}
-);
-
-video.addEventListener(
-"playing",
-()=>{
-
-spinner.classList.remove("show");
-
-}
-);
-
-video.addEventListener(
-"error",
-()=>{
-
-spinner.classList.remove("show");
-
-errBanner.textContent=
-"Unable to load video. The server may block browser playback.";
-
-errBanner.classList.add("show");
-
-setStatus("Error");
-
-}
-);
+video.addEventListener("timeupdate",updateSeekUI);
+video.addEventListener("loadedmetadata",()=>{
+  spinner.classList.remove("show");
+  updateSeekUI();
+  setTimeout(refreshSubtitleTracks,150);
+});
+video.addEventListener("durationchange",updateSeekUI);
+video.addEventListener("waiting",()=>spinner.classList.add("show"));
+video.addEventListener("playing",()=>spinner.classList.remove("show"));
+video.addEventListener("error",()=>{
+  spinner.classList.remove("show");
+  errBanner.textContent="Unable to load video. The server may block playback.";
+  errBanner.classList.add("show");
+  setStatus("Error");
+});
 
 /* ================= INDEXEDDB ================= */
-
 const DB_NAME="FluxplayStorageDB";
 const DB_VERSION=1;
 const STORE="archives";
-
 let db=null;
 
 function openDatabase(){
-
-return new Promise(
-(resolve,reject)=>{
-
-if(db){
-resolve(db);
-return;
-}
-
-if(!window.indexedDB){
-
-reject(
-new Error(
-"IndexedDB unavailable"
-)
-);
-
-return;
-}
-
-const req=
-indexedDB.open(
-DB_NAME,
-DB_VERSION
-);
-
-req.onupgradeneeded=e=>{
-
-const d=e.target.result;
-
-if(!d.objectStoreNames.contains(STORE)){
-
-d.createObjectStore(
-STORE,
-{
-keyPath:"id",
-autoIncrement:true
-}
-);
-
-}
-
-};
-
-req.onsuccess=e=>{
-
-db=e.target.result;
-
-db.onversionchange=()=>{
-db.close();
-};
-
-resolve(db);
-
-};
-
-req.onerror=()=>{
-
-reject(
-req.error||
-new Error(
-"IndexedDB open failed"
-)
-);
-
-};
-
-});
+  return new Promise((resolve,reject)=>{
+    if(db) return resolve(db);
+    if(!window.indexedDB) return reject(new Error("IndexedDB unavailable"));
+    const req=indexedDB.open(DB_NAME,DB_VERSION);
+    req.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains(STORE)){
+        d.createObjectStore(STORE,{keyPath:"id",autoIncrement:true});
+      }
+    };
+    req.onsuccess=e=>{
+      db=e.target.result;
+      db.onversionchange=()=>db.close();
+      resolve(db);
+    };
+    req.onerror=()=>reject(req.error||new Error("IndexedDB open failed"));
+  });
 }
 
 function txRequest(mode,fn){
-
-return openDatabase().then(
-d=>new Promise(
-(resolve,reject)=>{
-
-const tx=
-d.transaction(
-STORE,
-mode
-);
-
-const store=
-tx.objectStore(STORE);
-
-let result;
-
-try{
-
-result=fn(store);
-
-}catch(e){
-
-reject(e);
-return;
-
+  return openDatabase().then(d=>new Promise((resolve,reject)=>{
+    const tx=d.transaction(STORE,mode);
+    const store=tx.objectStore(STORE);
+    let result;
+    try{ result=fn(store); }catch(e){ return reject(e); }
+    result.onsuccess=e=>resolve(e.target.result);
+    result.onerror=()=>reject(result.error||new Error("IndexedDB request failed"));
+  }));
 }
 
-result.onsuccess=e=>{
-resolve(e.target.result);
-};
-
-result.onerror=()=>{
-
-reject(
-result.error||
-new Error(
-"IndexedDB request failed"
-)
-);
-
-};
-
-})
-);
-
-}
-
-function saveArchiveToDB(
-name,
-blob,
-count
-){
-
-return txRequest(
-"readwrite",
-s=>s.add({
-name,
-blob,
-count,
-createdAt:Date.now(),
-size:blob.size
-})
-);
-
+function saveArchiveToDB(name,blob,count){
+  return txRequest("readwrite",s=>s.add({name,blob,count,createdAt:Date.now(),size:blob.size}));
 }
 
 function getAllArchivesFromDB(){
-
-return txRequest(
-"readonly",
-s=>s.getAll()
-);
-
+  return txRequest("readonly",s=>s.getAll());
 }
 
 function deleteArchiveFromDB(id){
-
-return txRequest(
-"readwrite",
-s=>s.delete(id)
-);
-
+  return txRequest("readwrite",s=>s.delete(id));
 }
 
 function clearAllFromDB(){
-
-return txRequest(
-"readwrite",
-s=>s.clear()
-);
-
+  return txRequest("readwrite",s=>s.clear());
 }
 
 /* ================= STORAGE ================= */
-
 async function refreshStorageTelemetry(){
-
-try{
-
-if(
-navigator.storage&&
-navigator.storage.estimate
-){
-
-const e=
-await navigator.storage.estimate();
-
-const usage=e.usage||0;
-const quota=e.quota||1;
-
-storageUsageLabel.textContent=
-formatBytes(usage);
-
-storageBarFill.style.width=
-Math.min(
-100,
-Math.round(
-usage/quota*100
-)
-)+"%";
-
-}else{
-
-const a=
-await getAllArchivesFromDB();
-
-const n=
-a.reduce(
-(x,y)=>x+(y.size||0),
-0
-);
-
-storageUsageLabel.textContent=
-formatBytes(n);
-
-storageBarFill.style.width=
-"0%";
-
+  try{
+    if(navigator.storage&&navigator.storage.estimate){
+      const e=await navigator.storage.estimate();
+      const usage=e.usage||0;
+      const quota=e.quota||1;
+      storageUsageLabel.textContent=formatBytes(usage);
+      storageBarFill.style.width=Math.min(100,Math.round(usage/quota*100))+"%";
+    }else{
+      const a=await getAllArchivesFromDB();
+      const n=a.reduce((x,y)=>x+(y.size||0),0);
+      storageUsageLabel.textContent=formatBytes(n);
+      storageBarFill.style.width="0%";
+    }
+  }catch(e){}
 }
 
-}catch(e){}
-
-}
-
-/* ================= ARCHIVES ================= */
-
+/* ================= ARCHIVES UI ================= */
 async function renderArchives(){
+  try{
+    const a=await getAllArchivesFromDB();
+    archivesList.innerHTML="";
+    if(!a.length){
+      archivesSection.style.display="none";
+      await refreshStorageTelemetry();
+      return;
+    }
 
-try{
+    archivesSection.style.display="flex";
+    a.sort((x,y)=>(y.createdAt||0)-(x.createdAt||0));
 
-const a=
-await getAllArchivesFromDB();
+    a.forEach(arch=>{
+      const item=document.createElement("div");
+      item.className="archive-item";
 
-archivesList.innerHTML="";
+      const meta=document.createElement("div");
+      meta.className="archive-meta";
 
-if(!a.length){
+      const bubble=document.createElement("div");
+      bubble.className="zip-icon-bubble";
+      bubble.innerHTML='<span class="material-symbols-rounded">folder_zip</span>';
 
-archivesSection.style.display=
-"none";
+      const info=document.createElement("div");
+      info.style.minWidth="0";
+      info.style.flex="1";
 
-await refreshStorageTelemetry();
+      const name=document.createElement("div");
+      name.className="archive-name";
+      name.textContent=arch.name;
 
-return;
+      const size=document.createElement("div");
+      size.className="archive-size";
+      size.textContent=formatBytes(arch.size)+" • "+arch.count+" files";
 
-}
+      info.append(name,size);
+      meta.append(bubble,info);
 
-archivesSection.style.display=
-"flex";
+      const actions=document.createElement("div");
+      actions.className="archive-actions";
 
-a.sort(
-(x,y)=>
-(y.createdAt||0)-
-(x.createdAt||0)
-);
+      const dl=document.createElement("button");
+      dl.className="icon-btn-sm";
+      dl.title="Re-download";
+      dl.innerHTML='<span class="material-symbols-rounded">download</span>';
+      dl.onclick=async()=>{
+        try{
+          const all=await getAllArchivesFromDB();
+          const x=all.find(v=>v.id===arch.id);
+          if(x?.blob) saveAs(x.blob,x.name);
+        }catch(e){
+          alert("Could not reopen archive: "+e.message);
+        }
+      };
 
-a.forEach(arch=>{
+      const del=document.createElement("button");
+      del.className="icon-btn-sm delete";
+      del.title="Delete";
+      del.innerHTML='<span class="material-symbols-rounded">delete</span>';
+      del.onclick=async()=>{
+        await deleteArchiveFromDB(arch.id);
+        renderArchives();
+      };
 
-const item=
-document.createElement("div");
+      actions.append(dl,del);
+      item.append(meta,actions);
+      archivesList.appendChild(item);
+    });
 
-item.className="archive-item";
-
-const meta=
-document.createElement("div");
-
-meta.className="archive-meta";
-
-const bubble=
-document.createElement("div");
-
-bubble.className=
-"zip-icon-bubble";
-
-bubble.innerHTML=
-'<span class="material-symbols-rounded">folder_zip</span>';
-
-const info=
-document.createElement("div");
-
-const name=
-document.createElement("div");
-
-name.className="archive-name";
-name.textContent=arch.name;
-
-const size=
-document.createElement("div");
-
-size.className="archive-size";
-
-size.textContent=
-formatBytes(arch.size)+
-" • "+
-arch.count+
-" files";
-
-info.append(name,size);
-
-meta.append(bubble,info);
-
-const actions=
-document.createElement("div");
-
-actions.className=
-"archive-actions";
-
-const dl=
-document.createElement("button");
-
-dl.className="icon-btn-sm";
-dl.title="Re-download";
-
-dl.innerHTML=
-'<span class="material-symbols-rounded">download</span>';
-
-dl.onclick=async()=>{
-
-try{
-
-const all=
-await getAllArchivesFromDB();
-
-const x=
-all.find(v=>v.id===arch.id);
-
-if(x?.blob){
-saveAs(x.blob,x.name);
-}
-
-}catch(e){
-
-alert(
-"Could not reopen archive: "+
-e.message
-);
-
-}
-
-};
-
-const del=
-document.createElement("button");
-
-del.className=
-"icon-btn-sm delete";
-
-del.title="Delete";
-
-del.innerHTML=
-'<span class="material-symbols-rounded">delete</span>';
-
-del.onclick=async()=>{
-
-await deleteArchiveFromDB(
-arch.id
-);
-
-renderArchives();
-
-};
-
-actions.append(dl,del);
-
-item.append(meta,actions);
-
-archivesList.appendChild(item);
-
-});
-
-await refreshStorageTelemetry();
-
-}catch(e){
-
-console.warn(e);
-
-}
-
+    await refreshStorageTelemetry();
+  }catch(e){}
 }
 
 btnClearAllStorage.onclick=async()=>{
-
-if(
-confirm(
-"Clear all downloaded archives?"
-)
-){
-
-await clearAllFromDB();
-
-renderArchives();
-
-}
-
+  if(confirm("Clear all downloaded archives?")){
+    await clearAllFromDB();
+    renderArchives();
+  }
 };
 
-/* ================= URL INPUT ================= */
-
+/* ================= URL INPUT & DOWNLOADS ================= */
 function getUrls(){
-
-return zipUrls.value
-.replace(/\r/g,"")
-.split("\n")
-.map(x=>x.trim())
-.filter(Boolean);
-
+  return zipUrls.value.replace(/\r/g,"").split("\n").map(x=>x.trim()).filter(Boolean);
 }
 
-zipUrls.addEventListener(
-"input",
-()=>{
-
-const n=
-getUrls().length;
-
-fileCountBadge.textContent=
-n+
-" "+
-(
-n===1
-?"File Available"
-:"Files Available"
-);
-
-}
-);
-
-/* ================= DIRECT DOWNLOAD ================= */
+zipUrls.addEventListener("input",()=>{
+  const n=getUrls().length;
+  fileCountBadge.textContent=n+" "+(n===1?"File Available":"Files Available");
+});
 
 function nativeDownload(url){
-
-try{
-
-const a=
-document.createElement("a");
-
-a.href=url;
-a.target="_blank";
-a.rel="noopener";
-
-document.body.appendChild(a);
-
-a.click();
-
-a.remove();
-
-}catch(e){
-
-window.open(
-url,
-"_blank",
-"noopener"
-);
-
-}
-
+  try{
+    const a=document.createElement("a");
+    a.href=url;
+    a.target="_blank";
+    a.rel="noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }catch(e){
+    window.open(url,"_blank","noopener");
+  }
 }
 
 btnDirectDownload.onclick=()=>{
-
-const urls=getUrls();
-
-if(urls.length){
-nativeDownload(urls[0]);
-}
-
+  const urls=getUrls();
+  if(urls.length) nativeDownload(urls[0]);
 };
 
-/* ================= FETCH ================= */
+async function fetchDirect(url,signal,onProgress){
+  const res=await fetch(url,{
+    method:"GET",
+    signal,
+    cache:"no-store",
+    credentials:"omit",
+    redirect:"follow"
+  });
 
-async function fetchDirect(
-url,
-signal,
-onProgress
-){
+  if(!res.ok) throw new Error("HTTP "+res.status);
 
-const res=
-await fetch(
-url,
-{
-method:"GET",
-signal,
-cache:"no-store",
-credentials:"omit",
-redirect:"follow"
-}
-);
+  const total=Number(res.headers.get("Content-Length"))||0;
+  if(!res.body||!res.body.getReader){
+    const blob=await res.blob();
+    onProgress(blob.size,total||blob.size,blob.size);
+    return blob;
+  }
 
-if(!res.ok){
+  const reader=res.body.getReader();
+  const chunks=[];
+  let received=0;
 
-throw new Error(
-"HTTP "+res.status
-);
+  try{
+    while(true){
+      if(signal.aborted){
+        try{ await reader.cancel(); }catch(e){}
+        throw new DOMException("Aborted","AbortError");
+      }
+      const {done,value}=await reader.read();
+      if(done) break;
+      if(value){
+        chunks.push(value);
+        received+=value.byteLength;
+        onProgress(received,total,value.byteLength);
+      }
+    }
+  }catch(e){
+    try{ reader.releaseLock(); }catch(x){}
+    throw e;
+  }
 
-}
-
-const total=
-Number(
-res.headers.get("Content-Length")
-)||0;
-
-if(
-!res.body||
-!res.body.getReader
-){
-
-const blob=
-await res.blob();
-
-onProgress(
-blob.size,
-total||blob.size,
-blob.size
-);
-
-return blob;
-
+  return new Blob(chunks);
 }
 
-const reader=
-res.body.getReader();
-
-const chunks=[];
-
-let received=0;
-
-try{
-
-while(true){
-
-if(signal.aborted){
-
-try{
-await reader.cancel();
-}catch(e){}
-
-throw new DOMException(
-"Aborted",
-"AbortError"
-);
-
-}
-
-const{
-done,
-value
-}=await reader.read();
-
-if(done)break;
-
-if(value){
-
-chunks.push(value);
-
-received+=value.byteLength;
-
-onProgress(
-received,
-total,
-value.byteLength
-);
-
-}
-
-}
-
-}catch(e){
-
-try{
-reader.releaseLock();
-}catch(x){}
-
-throw e;
-
-}
-
-return new Blob(chunks);
-
-}
-
-/* ================= ZIP ================= */
-
+/* ================= ZIP GENERATION ================= */
 async function downloadWholeZip(){
+  const urls=getUrls();
+  if(!urls.length){
+    alert("Please enter at least one URL.");
+    return;
+  }
 
-const urls=getUrls();
+  directFallback.classList.remove("show");
+  telemetryBox.classList.add("active");
+  btnZipDownload.disabled=true;
 
-if(!urls.length){
+  currentAbortController=new AbortController();
+  const signal=currentAbortController.signal;
+  const zip=new JSZip();
 
-alert(
-"Please enter at least one URL."
-);
+  const totalFiles=urls.length;
+  const progress=new Array(totalFiles).fill(0);
+  const sizes=new Array(totalFiles).fill(0);
 
-return;
+  let completed=0;
+  let lastBytes=0;
+  let lastTime=performance.now();
 
+  function telemetry(){
+    const downloaded=progress.reduce((a,b)=>a+b,0);
+    const known=sizes.reduce((a,b)=>a+b,0);
+    const now=performance.now();
+    const dt=(now-lastTime)/1000;
+
+    if(dt>=.4){
+      statSpeed.textContent=formatBytes((downloaded-lastBytes)/dt)+"/s";
+      lastBytes=downloaded;
+      lastTime=now;
+    }
+
+    statSize.textContent=known
+      ? formatBytes(downloaded)+" / "+formatBytes(known)
+      : formatBytes(downloaded)+" / Unknown";
+
+    const pct=known
+      ? Math.min(94,Math.round(downloaded/known*94))
+      : Math.min(94,Math.round(completed/totalFiles*94));
+
+    zipPct.textContent=pct+"%";
+    zipBar.style.width=pct+"%";
+    zipFileProgressText.textContent="File "+completed+" of "+totalFiles+" completed";
+  }
+
+  try{
+    for(let i=0;i<urls.length;i++){
+      if(signal.aborted) throw new DOMException("Aborted","AbortError");
+
+      const url=urls[i];
+      const name=getFilename(url,i);
+
+      zipStatus.textContent="Downloading "+name;
+      zipFileProgressText.textContent="File "+(i+1)+" of "+totalFiles;
+
+      try{
+        const blob=await fetchDirect(url,signal,(received,total)=>{
+          progress[i]=received;
+          if(total) sizes[i]=total;
+          telemetry();
+        });
+
+        zip.file(name,blob,{binary:true,compression:"STORE"});
+      }catch(err){
+        if(err.name==="AbortError") throw err;
+        if(err instanceof TypeError||/Failed to fetch|NetworkError|CORS/i.test(err.message)){
+          directFallback.classList.add("show");
+          zipStatus.textContent="Browser blocked file access";
+          throw new Error("This browser does not allow JavaScript to read this remote file. Direct download is available below.");
+        }
+        zip.file(name+"_ERROR.txt","Download failed for "+url+"\nError: "+err.message);
+      }
+
+      completed++;
+      telemetry();
+    }
+
+    zipStatus.textContent="Building ZIP…";
+    zipPct.textContent="96%";
+    zipBar.style.width="96%";
+    statSpeed.textContent="Finalizing…";
+
+    const zipBlob=await zip.generateAsync({type:"blob",compression:"STORE"},meta=>{
+      const pct=Math.max(96,Math.round(96+meta.percent*.04));
+      zipPct.textContent=pct+"%";
+      zipBar.style.width=pct+"%";
+    });
+
+    const out=(zipName.value.trim()||"Files_Batch").replace(/[<>:"/\\|?*]/g,"_")+".zip";
+    saveAs(zipBlob,out);
+
+    try{
+      await saveArchiveToDB(out,zipBlob,urls.length);
+    }catch(e){}
+
+    await renderArchives();
+
+    zipStatus.textContent="ZIP Download Complete";
+    zipPct.textContent="100%";
+    zipBar.style.width="100%";
+    statSpeed.textContent="0 B/s";
+
+  }catch(err){
+    if(err.name==="AbortError"){
+      zipStatus.textContent="Download Canceled";
+      zipPct.textContent="0%";
+      zipBar.style.width="0%";
+      statSpeed.textContent="0 B/s";
+      setStatus("Canceled","canceled");
+    }else{
+      zipStatus.textContent=err.message||"Download failed";
+      if(/blocked|CORS|JavaScript to read/i.test(err.message)){
+        setStatus("Direct download available");
+      }else{
+        setStatus("Error");
+      }
+    }
+  }finally{
+    btnZipDownload.disabled=false;
+    currentAbortController=null;
+  }
 }
 
-directFallback.classList.remove(
-"show"
-);
-
-telemetryBox.classList.add(
-"active"
-);
-
-btnZipDownload.disabled=true;
-
-currentAbortController=
-new AbortController();
-
-const signal=
-currentAbortController.signal;
-
-const zip=new JSZip();
-
-const totalFiles=
-urls.length;
-
-const progress=
-new Array(totalFiles).fill(0);
-
-const sizes=
-new Array(totalFiles).fill(0);
-
-let completed=0;
-
-let lastBytes=0;
-let lastTime=performance.now();
-
-function telemetry(){
-
-const downloaded=
-progress.reduce(
-(a,b)=>a+b,
-0
-);
-
-const known=
-sizes.reduce(
-(a,b)=>a+b,
-0
-);
-
-const now=performance.now();
-
-const dt=
-(now-lastTime)/1000;
-
-if(dt>=.4){
-
-statSpeed.textContent=
-formatBytes(
-(downloaded-lastBytes)/dt
-)+"/s";
-
-lastBytes=downloaded;
-lastTime=now;
-
-}
-
-statSize.textContent=
-known
-?
-formatBytes(downloaded)+
-" / "+
-formatBytes(known)
-:
-formatBytes(downloaded)+
-" / Unknown";
-
-const pct=
-known
-?
-Math.min(
-94,
-Math.round(
-downloaded/known*94
-)
-)
-:
-Math.min(
-94,
-Math.round(
-completed/totalFiles*94
-)
-);
-
-zipPct.textContent=pct+"%";
-
-zipBar.style.width=pct+"%";
-
-zipFileProgressText.textContent=
-"File "+
-completed+
-" of "+
-totalFiles+
-" completed";
-
-}
-
-try{
-
-for(
-let i=0;
-i<urls.length;
-i++
-){
-
-if(signal.aborted){
-
-throw new DOMException(
-"Aborted",
-"AbortError"
-);
-
-}
-
-const url=urls[i];
-
-const name=
-getFilename(url,i);
-
-zipStatus.textContent=
-"Downloading "+name;
-
-zipFileProgressText.textContent=
-"File "+
-(i+1)+
-" of "+
-totalFiles;
-
-try{
-
-const blob=
-await fetchDirect(
-url,
-signal,
-(received,total)=>{
-
-progress[i]=received;
-
-if(total){
-sizes[i]=total;
-}
-
-telemetry();
-
-}
-);
-
-zip.file(
-name,
-blob,
-{
-binary:true,
-compression:"STORE"
-}
-);
-
-}catch(err){
-
-if(err.name==="AbortError"){
-throw err;
-}
-
-if(
-err instanceof TypeError||
-/Failed to fetch|NetworkError|CORS/i
-.test(err.message)
-){
-
-directFallback.classList.add(
-"show"
-);
-
-zipStatus.textContent=
-"Browser blocked file access";
-
-throw new Error(
-"This browser does not allow JavaScript to read this remote file. Direct download is available below."
-);
-
-}
-
-zip.file(
-name+"_ERROR.txt",
-"Download failed for "+
-url+
-"\nError: "+
-err.message
-);
-
-}
-
-completed++;
-
-telemetry();
-
-}
-
-zipStatus.textContent=
-"Building ZIP…";
-
-zipPct.textContent="96%";
-
-zipBar.style.width="96%";
-
-statSpeed.textContent=
-"Finalizing…";
-
-const zipBlob=
-await zip.generateAsync(
-{
-type:"blob",
-compression:"STORE"
-},
-meta=>{
-
-const pct=
-Math.max(
-96,
-Math.round(
-96+meta.percent*.04
-)
-);
-
-zipPct.textContent=
-pct+"%";
-
-zipBar.style.width=
-pct+"%";
-
-}
-);
-
-const out=
-(
-zipName.value.trim()||
-"Files_Batch"
-)
-.replace(
-/[<>:"/\\|?*]/g,
-"_"
-)+
-".zip";
-
-saveAs(zipBlob,out);
-
-try{
-
-await saveArchiveToDB(
-out,
-zipBlob,
-urls.length
-);
-
-}catch(e){
-
-console.warn(
-"Archive DB save failed:",
-e
-);
-
-}
-
-await renderArchives();
-
-zipStatus.textContent=
-"ZIP Download Complete";
-
-zipPct.textContent="100%";
-
-zipBar.style.width="100%";
-
-statSpeed.textContent="0 B/s";
-
-}catch(err){
-
-if(err.name==="AbortError"){
-
-zipStatus.textContent=
-"Download Canceled";
-
-zipPct.textContent="0%";
-
-zipBar.style.width="0%";
-
-statSpeed.textContent="0 B/s";
-
-setStatus(
-"Canceled",
-"canceled"
-);
-
-}else{
-
-zipStatus.textContent=
-err.message||
-"Download failed";
-
-if(
-/blocked|CORS|JavaScript to read/i
-.test(err.message)
-){
-
-setStatus(
-"Direct download available"
-);
-
-}else{
-
-setStatus("Error");
-
-}
-
-}
-
-}finally{
-
-btnZipDownload.disabled=false;
-
-currentAbortController=null;
-
-}
-
-}
-
-btnZipDownload.onclick=
-downloadWholeZip;
-
+btnZipDownload.onclick=downloadWholeZip;
 btnCancelDownload.onclick=()=>{
-
-if(currentAbortController){
-
-currentAbortController.abort();
-
-currentAbortController=null;
-
-}
-
+  if(currentAbortController){
+    currentAbortController.abort();
+    currentAbortController=null;
+  }
 };
 
-/* ================= INITIALIZE ================= */
-
+/* ================= INIT ================= */
 renderArchives();
 
 })();
