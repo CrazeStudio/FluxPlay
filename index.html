@@ -353,15 +353,15 @@ video::cue {
   display:flex;
   justify-content:flex-end;
   align-items:center;
-  gap:6px;
+  gap:8px;
 }
 
 .cc-btn{
   background:rgba(255,255,255,.12);
   border:1px solid var(--outline);
   border-radius:var(--rsm);
-  height:32px;
-  width:38px;
+  height:34px;
+  width:42px;
   padding:0;
   display:flex;
   align-items:center;
@@ -509,7 +509,7 @@ video::cue {
   font-size:11px;
   padding:6px 8px;
   outline:none;
-  height:32px;
+  height:34px;
 }
 
 .md-select option{
@@ -1095,22 +1095,17 @@ textarea.md-input{
       </div>
 
       <div class="skip-feedback left" id="animSkipLeft">
-        <span class="material-symbols-rounded">replay_30</span>
-        <span>-30s</span>
+        <span class="material-symbols-rounded">replay_10</span>
+        <span>-10s</span>
       </div>
 
       <div class="skip-feedback right" id="animSkipRight">
-        <span class="material-symbols-rounded">forward_30</span>
-        <span>+30s</span>
+        <span class="material-symbols-rounded">forward_10</span>
+        <span>+10s</span>
       </div>
 
       <div class="player-ui" id="playerUi">
         <div class="player-top-controls">
-          <!-- CC Button with Menu Launcher -->
-          <button class="cc-btn" id="btnCc" aria-label="Subtitle Menu">
-            <span class="material-symbols-rounded" id="ccIcon">closed_caption_off</span>
-          </button>
-
           <!-- Speed Select -->
           <select class="md-select" id="speedSelect">
             <option value=".75">0.75x</option>
@@ -1119,17 +1114,27 @@ textarea.md-input{
             <option value="1.5">1.5x</option>
             <option value="2">2.0x</option>
           </select>
+
+          <!-- CC Quick Toggle -->
+          <button class="cc-btn" id="btnCc" aria-label="Toggle Subtitles">
+            <span class="material-symbols-rounded" id="ccIcon">closed_caption_off</span>
+          </button>
+          
+          <!-- 3 Dot Menu (Opens CC/Settings Modal) -->
+          <button class="icon-action" id="btnMore" aria-label="More Settings" style="background:rgba(255,255,255,.12);border:1px solid var(--outline);border-radius:var(--rsm);height:34px;width:34px;padding:0;">
+            <span class="material-symbols-rounded">more_vert</span>
+          </button>
         </div>
 
         <div class="center-controls">
-          <button class="btn-circle" id="btnBack30" aria-label="Rewind 30 seconds">
-            <span class="material-symbols-rounded">replay_30</span>
+          <button class="btn-circle" id="btnBack10" aria-label="Rewind 10 seconds">
+            <span class="material-symbols-rounded">replay_10</span>
           </button>
           <button class="btn-circle play-btn" id="btnPlayCenter" aria-label="Play or pause">
             <span class="material-symbols-rounded" id="playIcon">play_arrow</span>
           </button>
-          <button class="btn-circle" id="btnFwd30" aria-label="Forward 30 seconds">
-            <span class="material-symbols-rounded">forward_30</span>
+          <button class="btn-circle" id="btnFwd10" aria-label="Forward 10 seconds">
+            <span class="material-symbols-rounded">forward_10</span>
           </button>
         </div>
 
@@ -1180,7 +1185,7 @@ textarea.md-input{
     <div class="md-card">
       <span class="card-label">Captions & Subtitles</span>
       <div class="subtitle-info">
-        Tap the <strong>CC</strong> icon on the player or use the tools below to add subtitles and generate captions on-device without an API key.
+        Tap the <strong>3-Dot menu</strong> on the player or use the tools below to add subtitles and generate captions on-device without an API key.
       </div>
       <button class="md-btn-ai" id="btnGenAiCaptions">
         <span class="material-symbols-rounded">auto_awesome</span>
@@ -1310,13 +1315,13 @@ textarea.md-input{
 
   </div>
 
-  <!-- ================= CC MENU POPUP ================= -->
+  <!-- ================= CC/SETTINGS MENU POPUP ================= -->
   <div class="cc-modal-backdrop" id="ccModal">
     <div class="cc-bottom-sheet">
       <div class="sheet-header">
         <div class="sheet-title">
-          <span class="material-symbols-rounded">closed_caption</span>
-          Subtitle & Caption Settings
+          <span class="material-symbols-rounded">settings</span>
+          Video Settings
         </div>
         <button class="icon-btn-sm" id="btnCloseCcModal" aria-label="Close menu">
           <span class="material-symbols-rounded">close</span>
@@ -1328,9 +1333,9 @@ textarea.md-input{
         AI Caption Generator (On-Device)
       </button>
 
-      <span class="card-label" style="margin-top:4px">Select Track</span>
+      <span class="card-label" style="margin-top:4px">Select Subtitle Track</span>
       <div class="sheet-option-list" id="ccTrackList">
-        <!-- Dynamic Track Options -->
+        <!-- Dynamic Track Options Go Here -->
       </div>
     </div>
   </div>
@@ -1372,8 +1377,8 @@ const btnStream=$("btnStream");
 const btnPlayCenter=$("btnPlayCenter");
 const playIcon=$("playIcon");
 
-const btnBack30=$("btnBack30");
-const btnFwd30=$("btnFwd30");
+const btnBack10=$("btnBack10");
+const btnFwd10=$("btnFwd10");
 
 const btnMute=$("btnMute");
 const muteIcon=$("muteIcon");
@@ -1385,6 +1390,7 @@ const speedSelect=$("speedSelect");
 
 const btnCc=$("btnCc");
 const ccIcon=$("ccIcon");
+const btnMore=$("btnMore");
 const ccModal=$("ccModal");
 const btnCloseCcModal=$("btnCloseCcModal");
 const ccTrackList=$("ccTrackList");
@@ -1505,7 +1511,7 @@ navStream.onclick=()=>switchTab(navStream,streamPanel);
 navZip.onclick=()=>switchTab(navZip,zipPanel);
 navSettings.onclick=()=>switchTab(navSettings,settingsPanel);
 
-/* ================= CC MENU & SUBTITLES ================= */
+/* ================= CC & SETTINGS MENU ================= */
 function disableAllSubtitleTracks(){
   const tracks=video.textTracks;
   if(tracks){
@@ -1513,12 +1519,8 @@ function disableAllSubtitleTracks(){
       tracks[i].mode="disabled";
     }
   }
-  if(externalSubtitleTrack){
-    externalSubtitleTrack.mode="disabled";
-  }
-  if(aiSubtitleTrack){
-    aiSubtitleTrack.mode="disabled";
-  }
+  if(externalSubtitleTrack) externalSubtitleTrack.mode="disabled";
+  if(aiSubtitleTrack) aiSubtitleTrack.mode="disabled";
 }
 
 function applySelectedTrack(choice){
@@ -1557,6 +1559,23 @@ function applySelectedTrack(choice){
   }
 }
 
+// CC Button quick-toggles between OFF and the last active track (or the first available).
+btnCc.onclick = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  if (activeTrackChoice !== "off") {
+    applySelectedTrack("off");
+  } else {
+    // If turning on, try to activate external, AI, or native track automatically
+    if (externalSubtitleTrack) applySelectedTrack("external");
+    else if (aiSubtitleTrack) applySelectedTrack("ai");
+    else if (video.textTracks && video.textTracks.length > 0) applySelectedTrack("native:0");
+    else subtitleStatus.textContent = "No subtitles available to enable.";
+  }
+  showUI();
+};
+
 function openCcModal(){
   buildCcMenuList();
   ccModal.classList.add("show");
@@ -1567,7 +1586,7 @@ function closeCcModal(){
   showUI();
 }
 
-btnCc.onclick=e=>{
+btnMore.onclick=e=>{
   e.preventDefault();
   e.stopPropagation();
   openCcModal();
@@ -1591,7 +1610,7 @@ function buildCcMenuList(){
   };
   ccTrackList.appendChild(offBtn);
 
-  // 2. AI Track option if present
+  // 2. AI Track option
   if(aiSubtitleTrack){
     const aiBtn=document.createElement("button");
     aiBtn.className="sheet-option-btn"+(activeTrackChoice==="ai"?" selected":"");
@@ -1603,7 +1622,7 @@ function buildCcMenuList(){
     ccTrackList.appendChild(aiBtn);
   }
 
-  // 3. External Track option if present
+  // 3. External Track option
   if(externalSubtitleTrack){
     const extBtn=document.createElement("button");
     extBtn.className="sheet-option-btn"+(activeTrackChoice==="external"?" selected":"");
@@ -1704,13 +1723,12 @@ async function generateAiCaptions(){
   setStatus("Generating AI Captions…");
   subtitleStatus.textContent="Running on-device AI transcription…";
 
-  // Check Web Speech API availability for real-time local transcription
+  // Attempt to use native Web Speech API if supported, else fallback to mock generation.
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (SpeechRec) {
     runSpeechRecognitionCaptioning(SpeechRec);
   } else {
-    // Client-side VTT generation fallback
     generateSimulatedSmartCaptions();
   }
 }
@@ -1749,9 +1767,7 @@ function runSpeechRecognitionCaptioning(SpeechRec){
     }
   };
 
-  recognition.onerror = () => {
-    generateSimulatedSmartCaptions();
-  };
+  recognition.onerror = () => generateSimulatedSmartCaptions();
 
   try{
     recognition.start();
@@ -1841,7 +1857,7 @@ streamUrl.addEventListener("keydown",e=>{
   }
 });
 
-/* ================= PLAY / SKIP ================= */
+/* ================= PLAY / SKIP (Fixed Freezing & Single Tap) ================= */
 function togglePlay(){
   if(!video.src) return;
   if(video.paused){
@@ -1853,11 +1869,16 @@ function togglePlay(){
 }
 
 function doSkip(seconds){
-  if(!video.src||!Number.isFinite(video.duration)||video.duration<=0) return false;
+  if(!video.src) return false;
   try{
-    const current=Number.isFinite(video.currentTime)?video.currentTime:0;
-    const target=Math.max(0,Math.min(video.duration,current+seconds));
-    video.currentTime=target;
+    const current = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+    let target = current + seconds;
+    if(Number.isFinite(video.duration) && video.duration > 0){
+      target = Math.max(0, Math.min(video.duration, target));
+    } else {
+      target = Math.max(0, target);
+    }
+    video.currentTime = target;
     updateSeekUI();
     return true;
   }catch(e){
@@ -1879,19 +1900,19 @@ btnPlayCenter.onclick=e=>{
   togglePlay();
 };
 
-btnBack30.onclick=e=>{
+btnBack10.onclick=e=>{
   e.preventDefault();
   e.stopPropagation();
-  if(doSkip(-30)){
+  if(doSkip(-10)){
     showSkip(animSkipLeft);
     showUI();
   }
 };
 
-btnFwd30.onclick=e=>{
+btnFwd10.onclick=e=>{
   e.preventDefault();
   e.stopPropagation();
-  if(doSkip(30)){
+  if(doSkip(10)){
     showSkip(animSkipRight);
     showUI();
   }
@@ -1908,25 +1929,32 @@ function installDoubleTap(el,side){
     e.stopPropagation();
 
     const now=performance.now();
-    if(now-lastTap<350){
+    if(now-lastTap < 300){
+      // Double Tap Registered
       clearTimeout(tapTimer);
       tapTimer=null;
       lastTap=0;
-      const amount=side==="left"?-30:30;
+      const amount=side==="left" ? -10 : 10;
       if(doSkip(amount)){
-        showSkip(side==="left"?animSkipLeft:animSkipRight);
+        showSkip(side==="left" ? animSkipLeft : animSkipRight);
         showUI();
       }
-      return;
+    } else {
+      // Single Tap Potential (Wait for second tap)
+      lastTap=now;
+      clearTimeout(tapTimer);
+      tapTimer=setTimeout(()=>{
+        lastTap=0;
+        tapTimer=null;
+        
+        // Single Tap Action: Toggle Player UI Visibility
+        if(playerCard.classList.contains("hide-ui")){
+          showUI();
+        }else{
+          playerCard.classList.add("hide-ui");
+        }
+      }, 300);
     }
-
-    lastTap=now;
-    clearTimeout(tapTimer);
-    tapTimer=setTimeout(()=>{
-      lastTap=0;
-      tapTimer=null;
-      showUI();
-    },350);
   },{passive:false});
 }
 
