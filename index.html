@@ -708,15 +708,15 @@ textarea.md-input{
   box-shadow:0 4px 14px rgba(236,72,153,.3);
 }
 
-.md-btn-secondary{
-  background:rgba(255,255,255,.08);
-  color:var(--text);
-  border:1px solid var(--outline);
+.md-btn-danger{
+  background:rgba(251,113,133,.12);
+  color:var(--error);
+  border:1px solid rgba(251,113,133,.25);
   min-height:44px;
-  padding:10px 14px;
+  padding:10px 16px;
   border-radius:var(--rsm);
   font-weight:700;
-  font-size:12px;
+  font-size:13px;
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -738,22 +738,6 @@ textarea.md-input{
   cursor:pointer;
 }
 
-.md-btn-danger{
-  background:rgba(251,113,133,.12);
-  color:var(--error);
-  border:1px solid rgba(251,113,133,.25);
-  min-height:44px;
-  padding:10px 16px;
-  border-radius:var(--rsm);
-  font-weight:700;
-  font-size:13px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:6px;
-  cursor:pointer;
-}
-
 .input-btn-group{
   display:flex;
   gap:8px;
@@ -763,35 +747,6 @@ textarea.md-input{
   .input-btn-group{
     flex-direction:column;
   }
-}
-
-/* ================= SUBTITLES ================= */
-
-.subtitle-info{
-  font-size:11px;
-  color:var(--subtle);
-  line-height:1.4;
-}
-
-.subtitle-row{
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-
-.subtitle-actions{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-}
-
-.subtitle-status{
-  font-size:11px;
-  color:var(--subtle);
-  padding:8px 10px;
-  border-radius:var(--rsm);
-  background:var(--container);
-  border:1px solid var(--outline);
 }
 
 /* ================= TELEMETRY ================= */
@@ -1072,8 +1027,7 @@ textarea.md-input{
         id="video"
         playsinline
         webkit-playsinline
-        preload="metadata"
-        crossorigin="anonymous">
+        preload="metadata">
       </video>
 
       <div class="gesture-surface">
@@ -1091,7 +1045,7 @@ textarea.md-input{
       </div>
 
       <div class="err-banner" id="errBanner">
-        Unable to load video. Check the link or CORS policy.
+        Unable to load video. Check the link.
       </div>
 
       <div class="skip-feedback left" id="animSkipLeft">
@@ -1179,42 +1133,6 @@ textarea.md-input{
         <span class="material-symbols-rounded">play_arrow</span>
         Play Stream
       </button>
-    </div>
-
-    <!-- ================= SUBTITLES & AI CAPTIONS ================= -->
-    <div class="md-card">
-      <span class="card-label">Captions & Subtitles</span>
-      <div class="subtitle-info">
-        Tap the <strong>3-Dot menu</strong> on the player or use the tools below to add subtitles and generate captions on-device without an API key.
-      </div>
-      <button class="md-btn-ai" id="btnGenAiCaptions">
-        <span class="material-symbols-rounded">auto_awesome</span>
-        AI Auto-Generate Captions (No API)
-      </button>
-
-      <div class="subtitle-row">
-        <input
-          class="md-input"
-          id="subtitleUrl"
-          type="url"
-          placeholder="https://example.com/subtitles.vtt"
-          inputmode="url"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false">
-      </div>
-      <div class="subtitle-actions">
-        <button class="md-btn" id="btnLoadSubtitle">
-          <span class="material-symbols-rounded">subtitles</span>
-          Load VTT
-        </button>
-        <button class="md-btn-secondary" id="btnDownloadSubtitle">
-          <span class="material-symbols-rounded">download</span>
-          Download VTT
-        </button>
-      </div>
-      <div class="subtitle-status" id="subtitleStatus">No subtitle loaded.</div>
     </div>
 
     <!-- ================= ZIP ================= -->
@@ -1395,12 +1313,6 @@ const ccModal=$("ccModal");
 const btnCloseCcModal=$("btnCloseCcModal");
 const ccTrackList=$("ccTrackList");
 const btnSheetGenAi=$("btnSheetGenAi");
-const btnGenAiCaptions=$("btnGenAiCaptions");
-
-const subtitleUrl=$("subtitleUrl");
-const btnLoadSubtitle=$("btnLoadSubtitle");
-const btnDownloadSubtitle=$("btnDownloadSubtitle");
-const subtitleStatus=$("subtitleStatus");
 
 const timeLabel=$("timeLabel");
 
@@ -1452,7 +1364,6 @@ let uiTimer=null;
 let isScrubbing=false;
 let wasPlaying=false;
 let currentAbortController=null;
-let externalSubtitleTrack=null;
 let aiSubtitleTrack=null;
 let activeTrackChoice="off"; 
 
@@ -1519,7 +1430,6 @@ function disableAllSubtitleTracks(){
       tracks[i].mode="disabled";
     }
   }
-  if(externalSubtitleTrack) externalSubtitleTrack.mode="disabled";
   if(aiSubtitleTrack) aiSubtitleTrack.mode="disabled";
 }
 
@@ -1530,7 +1440,6 @@ function applySelectedTrack(choice){
   if(choice==="off"){
     btnCc.classList.remove("active");
     ccIcon.textContent="closed_caption_off";
-    subtitleStatus.textContent="Subtitles disabled.";
     return;
   }
 
@@ -1539,13 +1448,6 @@ function applySelectedTrack(choice){
 
   if(choice==="ai"&&aiSubtitleTrack){
     aiSubtitleTrack.mode="showing";
-    subtitleStatus.textContent="AI Generated Captions active.";
-    return;
-  }
-
-  if(choice==="external"&&externalSubtitleTrack){
-    externalSubtitleTrack.mode="showing";
-    subtitleStatus.textContent="External subtitle active.";
     return;
   }
 
@@ -1554,12 +1456,10 @@ function applySelectedTrack(choice){
     const track=video.textTracks[idx];
     if(track){
       track.mode="showing";
-      subtitleStatus.textContent="Subtitle: "+(track.label||track.language||"Track "+(idx+1));
     }
   }
 }
 
-// CC Button quick-toggles between OFF and the last active track (or the first available).
 btnCc.onclick = (e) => {
   e.preventDefault();
   e.stopPropagation();
@@ -1567,11 +1467,8 @@ btnCc.onclick = (e) => {
   if (activeTrackChoice !== "off") {
     applySelectedTrack("off");
   } else {
-    // If turning on, try to activate external, AI, or native track automatically
-    if (externalSubtitleTrack) applySelectedTrack("external");
-    else if (aiSubtitleTrack) applySelectedTrack("ai");
+    if (aiSubtitleTrack) applySelectedTrack("ai");
     else if (video.textTracks && video.textTracks.length > 0) applySelectedTrack("native:0");
-    else subtitleStatus.textContent = "No subtitles available to enable.";
   }
   showUI();
 };
@@ -1622,24 +1519,12 @@ function buildCcMenuList(){
     ccTrackList.appendChild(aiBtn);
   }
 
-  // 3. External Track option
-  if(externalSubtitleTrack){
-    const extBtn=document.createElement("button");
-    extBtn.className="sheet-option-btn"+(activeTrackChoice==="external"?" selected":"");
-    extBtn.innerHTML='<span>External WebVTT (.vtt)</span>'+(activeTrackChoice==="external"?'<span class="material-symbols-rounded">check</span>':'');
-    extBtn.onclick=()=>{
-      applySelectedTrack("external");
-      closeCcModal();
-    };
-    ccTrackList.appendChild(extBtn);
-  }
-
-  // 4. Native Embedded Tracks
+  // 3. Native Embedded Tracks
   const tracks=video.textTracks;
   if(tracks){
     for(let i=0;i<tracks.length;i++){
       const tr=tracks[i];
-      if(tr===aiSubtitleTrack||tr===externalSubtitleTrack) continue;
+      if(tr===aiSubtitleTrack) continue;
       const key="native:"+i;
       const optBtn=document.createElement("button");
       optBtn.className="sheet-option-btn"+(activeTrackChoice===key?" selected":"");
@@ -1653,65 +1538,6 @@ function buildCcMenuList(){
   }
 }
 
-function loadExternalSubtitle(url){
-  url=String(url||"").trim();
-  if(!url){
-    alert("Enter a .vtt subtitle URL.");
-    return;
-  }
-
-  if(externalSubtitleTrack){
-    try{ externalSubtitleTrack.mode="disabled"; }catch(e){}
-    externalSubtitleTrack=null;
-  }
-
-  const old=video.querySelector('track[data-fluxplay-external="1"]');
-  if(old) old.remove();
-
-  const track=document.createElement("track");
-  track.kind="subtitles";
-  track.label="External Subtitle";
-  track.srclang="en";
-  track.src=url;
-  track.default=true;
-  track.dataset.fluxplayExternal="1";
-
-  video.appendChild(track);
-  externalSubtitleTrack=track.track;
-
-  track.addEventListener("load",()=>{
-    applySelectedTrack("external");
-    subtitleStatus.textContent="External WebVTT subtitle loaded & active.";
-  },{once:true});
-
-  track.addEventListener("error",()=>{
-    subtitleStatus.textContent="Unable to load subtitle. Check VTT URL or CORS.";
-  });
-
-  subtitleStatus.textContent="Loading subtitle…";
-}
-
-btnLoadSubtitle.onclick=()=>loadExternalSubtitle(subtitleUrl.value);
-
-btnDownloadSubtitle.onclick=()=>{
-  const url=subtitleUrl.value.trim();
-  if(!url){
-    alert("Enter an external subtitle URL first.");
-    return;
-  }
-  try{
-    const a=document.createElement("a");
-    a.href=url;
-    a.target="_blank";
-    a.rel="noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }catch(e){
-    window.open(url,"_blank","noopener");
-  }
-};
-
 /* ================= ON-DEVICE AI CAPTION GENERATOR ================= */
 async function generateAiCaptions(){
   if(!video.src){
@@ -1721,9 +1547,7 @@ async function generateAiCaptions(){
 
   closeCcModal();
   setStatus("Generating AI Captions…");
-  subtitleStatus.textContent="Running on-device AI transcription…";
 
-  // Attempt to use native Web Speech API if supported, else fallback to mock generation.
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (SpeechRec) {
@@ -1772,7 +1596,6 @@ function runSpeechRecognitionCaptioning(SpeechRec){
   try{
     recognition.start();
     applySelectedTrack("ai");
-    subtitleStatus.textContent = "AI Speech-to-Text active on-device.";
     setStatus("Playing", "live");
   }catch(e){
     generateSimulatedSmartCaptions();
@@ -1814,7 +1637,6 @@ function generateSimulatedSmartCaptions(){
 
   track.addEventListener("load", ()=>{
     applySelectedTrack("ai");
-    subtitleStatus.textContent = "On-device AI captions generated successfully.";
     setStatus("Playing", "live");
   }, { once: true });
 }
@@ -1827,26 +1649,28 @@ function fmtVttTime(sec){
 }
 
 btnSheetGenAi.onclick = generateAiCaptions;
-btnGenAiCaptions.onclick = generateAiCaptions;
 
 /* ================= VIDEO SOURCE ================= */
 function playSource(url){
   url=String(url||"").trim();
   if(!url) return;
+
   errBanner.classList.remove("show");
   playerCard.classList.add("has-src");
   spinner.classList.add("show");
   setStatus("Loading…");
 
-  video.pause();
-  video.removeAttribute("src");
-  video.load();
-  video.src=url;
-  video.load();
+  video.src = url;
 
   video.play()
-    .then(()=>setStatus("Playing","live"))
-    .catch(()=>setStatus("Ready"));
+    .then(()=>{
+      setStatus("Playing","live");
+    })
+    .catch(()=>{
+      // If mobile browser blocks autoplay, ready the player without error
+      spinner.classList.remove("show");
+      setStatus("Ready");
+    });
 }
 
 btnStream.onclick=()=>playSource(streamUrl.value);
@@ -1857,7 +1681,7 @@ streamUrl.addEventListener("keydown",e=>{
   }
 });
 
-/* ================= PLAY / SKIP (Fixed Freezing & Single Tap) ================= */
+/* ================= PLAY / SKIP ================= */
 function togglePlay(){
   if(!video.src) return;
   if(video.paused){
@@ -1930,7 +1754,6 @@ function installDoubleTap(el,side){
 
     const now=performance.now();
     if(now-lastTap < 300){
-      // Double Tap Registered
       clearTimeout(tapTimer);
       tapTimer=null;
       lastTap=0;
@@ -1940,14 +1763,12 @@ function installDoubleTap(el,side){
         showUI();
       }
     } else {
-      // Single Tap Potential (Wait for second tap)
       lastTap=now;
       clearTimeout(tapTimer);
       tapTimer=setTimeout(()=>{
         lastTap=0;
         tapTimer=null;
         
-        // Single Tap Action: Toggle Player UI Visibility
         if(playerCard.classList.contains("hide-ui")){
           showUI();
         }else{
@@ -2080,14 +1901,23 @@ video.addEventListener("pause",()=>{
 video.addEventListener("timeupdate",updateSeekUI);
 video.addEventListener("loadedmetadata",()=>{
   spinner.classList.remove("show");
+  errBanner.classList.remove("show");
   updateSeekUI();
+});
+video.addEventListener("canplay",()=>{
+  spinner.classList.remove("show");
+  errBanner.classList.remove("show");
 });
 video.addEventListener("durationchange",updateSeekUI);
 video.addEventListener("waiting",()=>spinner.classList.add("show"));
-video.addEventListener("playing",()=>spinner.classList.remove("show"));
-video.addEventListener("error",()=>{
+video.addEventListener("playing",()=>{
   spinner.classList.remove("show");
-  errBanner.textContent="Unable to load video. The server may block playback.";
+  errBanner.classList.remove("show");
+});
+video.addEventListener("error",()=>{
+  if(!video.src) return;
+  spinner.classList.remove("show");
+  errBanner.textContent="Unable to load video. Check the link.";
   errBanner.classList.add("show");
   setStatus("Error");
 });
