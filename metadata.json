@@ -1,0 +1,6 @@
+{
+  "name": "Fluxplay",
+  "description": "Video streaming player with multi-source metadata discovery for Movies, TV Shows, Anime, and Letterboxd.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
