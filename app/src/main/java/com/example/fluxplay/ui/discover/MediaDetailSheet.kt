@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Movie
@@ -208,7 +209,7 @@ fun MediaDetailSheet(
                         )
                     ) {
                         Icon(
-                            if (isExternal) Icons.Default.OpenInNew else Icons.Default.PlayArrow,
+                            if (isExternal) Icons.AutoMirrored.Filled.OpenInNew else Icons.Default.PlayArrow,
                             contentDescription = null
                         )
                         Spacer(Modifier.width(6.dp))
@@ -361,7 +362,7 @@ fun MediaDetailSheet(
                         .height(42.dp),
                     shape = CircleShape
                 ) {
-                    Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Open Source Page", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }

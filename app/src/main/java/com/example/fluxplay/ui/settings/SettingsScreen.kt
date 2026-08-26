@@ -28,8 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.OndemandVideo
+import androidx.compose.material.icons.filled.RadioButtonChecked
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -44,6 +48,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -60,11 +66,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import com.example.fluxplay.R
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.fluxplay.R
 import com.example.fluxplay.ui.theme.parseHexColor
 import kotlinx.coroutines.launch
 
@@ -80,10 +85,6 @@ fun SettingsScreen(
 
     var showClearDialog by remember { mutableStateOf(false) }
     var tmdbKeyInput by remember(settings.tmdbKey) { mutableStateOf(settings.tmdbKey) }
-    var lbxUserInput by remember(settings.lbxUsername) { mutableStateOf(settings.lbxUsername) }
-    var lbxIdInput by remember(settings.lbxClientId) { mutableStateOf(settings.lbxClientId) }
-    var lbxSecretInput by remember(settings.lbxClientSecret) { mutableStateOf(settings.lbxClientSecret) }
-
     var themeMenuOpen by remember { mutableStateOf(false) }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -169,7 +170,7 @@ fun SettingsScreen(
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        text = "The Modern Stream & Media Browser",
+                        text = "High-Performance Stream & Media Player",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -183,9 +184,278 @@ fun SettingsScreen(
             fontWeight = FontWeight.Bold
         )
 
+        // Player Engine & Style Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_player_engine_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Player Engine & Interface",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Choose your playback interface style and controls",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Built-in Player Option Tile
+                val isBuiltin = settings.playerType == "builtin"
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isBuiltin) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer,
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isBuiltin) 1.5.dp else 1.dp,
+                        color = if (isBuiltin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            viewModel.updatePlayerType("builtin")
+                            Toast.makeText(context, "Built-in Player active", Toast.LENGTH_SHORT).show()
+                        }
+                        .testTag("select_player_builtin")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(if (isBuiltin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayCircle,
+                                contentDescription = null,
+                                tint = if (isBuiltin) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Built-in Player",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Media3 Native",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Standard high-performance native Android player with clean center controls and gesture seeking.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Icon(
+                            imageVector = if (isBuiltin) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+                            contentDescription = null,
+                            tint = if (isBuiltin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // JW Player Option Tile
+                val isJw = settings.playerType == "jwplayer"
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isJw) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer,
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isJw) 1.5.dp else 1.dp,
+                        color = if (isJw) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            viewModel.updatePlayerType("jwplayer")
+                            Toast.makeText(context, "JW Player interface active", Toast.LENGTH_SHORT).show()
+                        }
+                        .testTag("select_player_jwplayer")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(if (isJw) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OndemandVideo,
+                                contentDescription = null,
+                                tint = if (isJw) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "JW Player",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = Color(0xFFFF2B54).copy(alpha = 0.2f),
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "JW Pro",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Color(0xFFFF4066),
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Iconic JW Player layout with bottom controller dock, HD quality pills, and signature scrub bar.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Icon(
+                            imageVector = if (isJw) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+                            contentDescription = null,
+                            tint = if (isJw) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Vimeo Player Option Tile
+                val isVimeo = settings.playerType == "vimeo"
+                val vimeoBlue = Color(0xFF00ADEF)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isVimeo) vimeoBlue.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer,
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isVimeo) 1.5.dp else 1.dp,
+                        color = if (isVimeo) vimeoBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            viewModel.updatePlayerType("vimeo")
+                            Toast.makeText(context, "Vimeo Player interface active", Toast.LENGTH_SHORT).show()
+                        }
+                        .testTag("select_player_vimeo")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(if (isVimeo) vimeoBlue else MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayCircle,
+                                contentDescription = null,
+                                tint = if (isVimeo) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Vimeo Player",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = vimeoBlue.copy(alpha = 0.2f),
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Vimeo Pro",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = vimeoBlue,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Minimalist Vimeo aesthetic with signature cyan scrubber, floating center play button, and clean controls dock.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Icon(
+                            imageVector = if (isVimeo) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+                            contentDescription = null,
+                            tint = if (isVimeo) vimeoBlue else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
         // Appearance Card
         Card(
-            modifier = Modifier.fillMaxWidth().testTag("settings_appearance_card"),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_appearance_card"),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
@@ -208,7 +478,11 @@ fun SettingsScreen(
                 ) {
                     Column {
                         Text("Theme", style = MaterialTheme.typography.titleSmall)
-                        Text("Switch between dark, light, or system theme", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Switch between dark, light, or system theme",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
                     Box {
@@ -245,7 +519,7 @@ fun SettingsScreen(
 
                 // Primary Color Palette
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Primary Color", style = MaterialTheme.typography.titleSmall)
+                    Text("Primary Accent Color", style = MaterialTheme.typography.titleSmall)
                     val primaryColors = listOf("#A78BFA", "#6366F1", "#3B82F6", "#10B981", "#EC4899", "#F59E0B")
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -268,7 +542,12 @@ fun SettingsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
@@ -277,7 +556,7 @@ fun SettingsScreen(
 
                 // Accent Color Palette
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Accent Glow Color", style = MaterialTheme.typography.titleSmall)
+                    Text("Secondary Glow Color", style = MaterialTheme.typography.titleSmall)
                     val accentColors = listOf("#F43F5E", "#EF4444", "#F97316", "#8B5CF6", "#06B6D4", "#10B981")
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -300,7 +579,12 @@ fun SettingsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
@@ -309,9 +593,75 @@ fun SettingsScreen(
             }
         }
 
+        // Background Playback & Notifications Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_background_playback_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Background Playback",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Keep audio playing when minimized or when the screen is locked, with system media notification controls.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = settings.backgroundPlayback,
+                        onCheckedChange = { enabled ->
+                            viewModel.updateBackgroundPlayback(enabled)
+                            Toast.makeText(
+                                context,
+                                if (enabled) "Background playback enabled" else "Background playback disabled",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.testTag("switch_background_playback")
+                    )
+                }
+            }
+        }
+
         // TMDB API Card
         Card(
-            modifier = Modifier.fillMaxWidth().testTag("settings_tmdb_card"),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_tmdb_card"),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
@@ -321,13 +671,13 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Metadata APIs (TMDB)",
+                    text = "Metadata API (TMDB)",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
 
                 Text(
-                    text = "Add a free TMDB API key to unlock real-time theatrical movies and trailers.",
+                    text = "Add an optional TMDB API key to search the latest movies and official trailers directly.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -338,7 +688,9 @@ fun SettingsScreen(
                         tmdbKeyInput = it
                         viewModel.updateTmdbKey(it)
                     },
-                    modifier = Modifier.fillMaxWidth().testTag("tmdb_key_input"),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("tmdb_key_input"),
                     placeholder = { Text("Enter TMDB API Key...", fontSize = 13.sp) },
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
@@ -349,73 +701,18 @@ fun SettingsScreen(
                 )
 
                 Text(
-                    text = "Don't have one? Get a free key at themoviedb.org under Settings > API.",
+                    text = "Open databases (TVMaze & Jikan Anime) work instantly without any API key required.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // Letterboxd Card
-        Card(
-            modifier = Modifier.fillMaxWidth().testTag("settings_letterboxd_card"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "Letterboxd Integration",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                OutlinedTextField(
-                    value = lbxUserInput,
-                    onValueChange = {
-                        lbxUserInput = it
-                        viewModel.updateLetterboxd(it, lbxIdInput, lbxSecretInput)
-                    },
-                    label = { Text("Username (Public RSS)") },
-                    placeholder = { Text("e.g. your_username", fontSize = 13.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                OutlinedTextField(
-                    value = lbxIdInput,
-                    onValueChange = {
-                        lbxIdInput = it
-                        viewModel.updateLetterboxd(lbxUserInput, it, lbxSecretInput)
-                    },
-                    label = { Text("API Client ID (Optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                OutlinedTextField(
-                    value = lbxSecretInput,
-                    onValueChange = {
-                        lbxSecretInput = it
-                        viewModel.updateLetterboxd(lbxUserInput, lbxIdInput, it)
-                    },
-                    label = { Text("API Client Secret (Optional)") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp)
-                )
-            }
-        }
-
         // Backup & Restore Card
         Card(
-            modifier = Modifier.fillMaxWidth().testTag("settings_backup_card"),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_backup_card"),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
@@ -443,7 +740,10 @@ fun SettingsScreen(
                             context.startActivity(shareIntent)
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(46.dp).testTag("export_backup_button"),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                        .testTag("export_backup_button"),
                     shape = CircleShape
                 ) {
                     Icon(Icons.Default.Upload, contentDescription = null)
@@ -453,7 +753,10 @@ fun SettingsScreen(
 
                 OutlinedButton(
                     onClick = { importLauncher.launch("*/*") },
-                    modifier = Modifier.fillMaxWidth().height(46.dp).testTag("restore_backup_button"),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                        .testTag("restore_backup_button"),
                     shape = CircleShape
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null)
@@ -463,7 +766,10 @@ fun SettingsScreen(
 
                 OutlinedButton(
                     onClick = { showClearDialog = true },
-                    modifier = Modifier.fillMaxWidth().height(46.dp).testTag("clear_data_button"),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                        .testTag("clear_data_button"),
                     shape = CircleShape,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -491,7 +797,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "Fluxplay stores history, bookmarks, preferences, and cached metadata strictly on your device using a local Room SQLite database.\n\nYour data is never uploaded to any remote Fluxplay server. Metadata searches connect directly to the selected public providers.",
+                    text = "Fluxplay stores history, bookmarks, and preferences locally on your device using Room SQLite.\n\nYour data is never uploaded to any remote server. Metadata searches connect directly to public movie and show catalog providers.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 18.sp
@@ -500,10 +806,12 @@ fun SettingsScreen(
         }
 
         Text(
-            text = "Fluxplay 2.0 • Android Edition",
+            text = "Fluxplay • Native Edition",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 16.dp)
         )
     }
 }

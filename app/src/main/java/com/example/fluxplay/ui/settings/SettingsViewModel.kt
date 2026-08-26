@@ -34,6 +34,14 @@ class SettingsViewModel(
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
+    fun updateBackgroundPlayback(enabled: Boolean) {
+        settingsRepository.updateBackgroundPlayback(enabled)
+    }
+
+    fun updatePlayerType(playerType: String) {
+        settingsRepository.updatePlayerType(playerType)
+    }
+
     fun updateTheme(theme: String) {
         settingsRepository.updateTheme(theme)
     }
@@ -48,10 +56,6 @@ class SettingsViewModel(
 
     fun updateTmdbKey(key: String) {
         settingsRepository.updateTmdbKey(key)
-    }
-
-    fun updateLetterboxd(username: String, clientId: String, clientSecret: String) {
-        settingsRepository.updateLetterboxdConfig(username, clientId, clientSecret)
     }
 
     suspend fun createBackupJson(): String = withContext(Dispatchers.IO) {

@@ -24,6 +24,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -34,6 +36,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -45,7 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -63,6 +69,8 @@ fun DiscoverScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val clipboardManager = LocalClipboardManager.current
+    val hapticFeedback = LocalHapticFeedback.current
 
     LazyColumn(
         modifier = modifier
@@ -90,13 +98,26 @@ fun DiscoverScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Discover & Search",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     Text(
-                        text = "Discover & Search",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Search across multiple movie, anime, and TV databases.",
+                        text = "Instant fast search across TMDB, TVMaze, Jikan Anime, and Open Movie databases.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -112,10 +133,37 @@ fun DiscoverScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("discover_search_input"),
-                            placeholder = { Text("Search Movies, Anime, TV...", fontSize = 13.sp) },
+                            placeholder = { Text("Search Movies, Anime, TV, Vimeo...", fontSize = 13.sp) },
                             singleLine = true,
+                            trailingIcon = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (uiState.searchQuery.isNotBlank()) {
+                                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                    IconButton(onClick = {
+                                        val clip = clipboardManager.getText()?.text?.trim()
+                                        if (!clip.isNullOrBlank()) {
+                                            viewModel.updateSearchQuery(clip)
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.performSearch()
+                                        }
+                                    }) {
+                                        Icon(
+                                            Icons.Default.ContentPaste,
+                                            contentDescription = "Paste & Search",
+                                            tint = Color(0xFFF59E0B),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = { viewModel.performSearch() }),
+                            keyboardActions = KeyboardActions(onSearch = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.performSearch()
+                            }),
                             shape = RoundedCornerShape(10.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -126,7 +174,10 @@ fun DiscoverScreen(
                         )
 
                         Button(
-                            onClick = { viewModel.performSearch() },
+                            onClick = {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.performSearch()
+                            },
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .height(52.dp)
@@ -173,7 +224,7 @@ fun DiscoverScreen(
                         FilterChip(
                             selected = uiState.searchTv,
                             onClick = { viewModel.toggleFilter("tv") },
-                            label = { Text("TV", fontSize = 11.sp) },
+                            label = { Text("TV Shows", fontSize = 11.sp) },
                             leadingIcon = if (uiState.searchTv) {
                                 { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(14.dp)) }
                             } else null,
@@ -184,15 +235,15 @@ fun DiscoverScreen(
                         )
 
                         FilterChip(
-                            selected = uiState.searchLetterboxd,
-                            onClick = { viewModel.toggleFilter("letterboxd") },
-                            label = { Text("Letterboxd", fontSize = 11.sp) },
-                            leadingIcon = if (uiState.searchLetterboxd) {
+                            selected = uiState.searchVimeo,
+                            onClick = { viewModel.toggleFilter("vimeo") },
+                            label = { Text("Vimeo", fontSize = 11.sp) },
+                            leadingIcon = if (uiState.searchVimeo) {
                                 { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(14.dp)) }
                             } else null,
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                selectedLabelColor = MaterialTheme.colorScheme.primary
+                                selectedContainerColor = Color(0xFF00ADEF).copy(alpha = 0.2f),
+                                selectedLabelColor = Color(0xFF00ADEF)
                             )
                         )
                     }

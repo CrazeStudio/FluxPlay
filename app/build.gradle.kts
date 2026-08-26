@@ -32,12 +32,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "21"
+        jvmTarget = "17"
     }
 
     buildFeatures {
@@ -70,7 +70,10 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.exoplayer.dash)
+    implementation(libs.androidx.media3.datasource)
+    implementation(libs.androidx.media3.database)
     implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.session)
 
     // Networking & Serialization & Images
     implementation(libs.kotlinx.serialization.json)

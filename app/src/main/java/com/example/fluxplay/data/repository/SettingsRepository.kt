@@ -22,10 +22,9 @@ class SettingsRepository(context: Context) {
             theme = prefs.getString(KEY_THEME, "dark") ?: "dark",
             primaryColorHex = prefs.getString(KEY_PRIMARY_COLOR, "#A78BFA") ?: "#A78BFA",
             accentColorHex = prefs.getString(KEY_ACCENT_COLOR, "#F43F5E") ?: "#F43F5E",
+            backgroundPlayback = prefs.getBoolean(KEY_BACKGROUND_PLAYBACK, true),
             tmdbKey = prefs.getString(KEY_TMDB_KEY, "") ?: "",
-            lbxUsername = prefs.getString(KEY_LBX_USERNAME, "") ?: "",
-            lbxClientId = prefs.getString(KEY_LBX_CLIENT_ID, "") ?: "",
-            lbxClientSecret = prefs.getString(KEY_LBX_CLIENT_SECRET, "") ?: ""
+            playerType = prefs.getString(KEY_PLAYER_TYPE, "builtin") ?: "builtin"
         )
     }
 
@@ -34,12 +33,19 @@ class SettingsRepository(context: Context) {
             .putString(KEY_THEME, newSettings.theme)
             .putString(KEY_PRIMARY_COLOR, newSettings.primaryColorHex)
             .putString(KEY_ACCENT_COLOR, newSettings.accentColorHex)
+            .putBoolean(KEY_BACKGROUND_PLAYBACK, newSettings.backgroundPlayback)
             .putString(KEY_TMDB_KEY, newSettings.tmdbKey)
-            .putString(KEY_LBX_USERNAME, newSettings.lbxUsername)
-            .putString(KEY_LBX_CLIENT_ID, newSettings.lbxClientId)
-            .putString(KEY_LBX_CLIENT_SECRET, newSettings.lbxClientSecret)
+            .putString(KEY_PLAYER_TYPE, newSettings.playerType)
             .apply()
         _settings.value = newSettings
+    }
+
+    fun updatePlayerType(playerType: String) {
+        updateSettings(_settings.value.copy(playerType = playerType))
+    }
+
+    fun updateBackgroundPlayback(enabled: Boolean) {
+        updateSettings(_settings.value.copy(backgroundPlayback = enabled))
     }
 
     fun updateTheme(theme: String) {
@@ -58,23 +64,12 @@ class SettingsRepository(context: Context) {
         updateSettings(_settings.value.copy(tmdbKey = key.trim()))
     }
 
-    fun updateLetterboxdConfig(username: String, clientId: String, clientSecret: String) {
-        updateSettings(
-            _settings.value.copy(
-                lbxUsername = username.trim(),
-                lbxClientId = clientId.trim(),
-                lbxClientSecret = clientSecret.trim()
-            )
-        )
-    }
-
     companion object {
         private const val KEY_THEME = "theme"
         private const val KEY_PRIMARY_COLOR = "primary_color"
         private const val KEY_ACCENT_COLOR = "accent_color"
+        private const val KEY_BACKGROUND_PLAYBACK = "background_playback"
         private const val KEY_TMDB_KEY = "tmdb_key"
-        private const val KEY_LBX_USERNAME = "lbx_username"
-        private const val KEY_LBX_CLIENT_ID = "lbx_client_id"
-        private const val KEY_LBX_CLIENT_SECRET = "lbx_client_secret"
+        private const val KEY_PLAYER_TYPE = "player_type"
     }
 }

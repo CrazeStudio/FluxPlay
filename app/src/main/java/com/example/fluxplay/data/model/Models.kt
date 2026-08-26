@@ -36,10 +36,9 @@ data class AppSettings(
     val theme: String = "dark", // "dark", "light", "system"
     val primaryColorHex: String = "#A78BFA",
     val accentColorHex: String = "#F43F5E",
+    val backgroundPlayback: Boolean = true,
     val tmdbKey: String = "",
-    val lbxUsername: String = "",
-    val lbxClientId: String = "",
-    val lbxClientSecret: String = ""
+    val playerType: String = "builtin" // "builtin", "jwplayer"
 )
 
 @Serializable

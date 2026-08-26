@@ -21,7 +21,7 @@ data class DiscoverUiState(
     val searchMovies: Boolean = true,
     val searchAnime: Boolean = true,
     val searchTv: Boolean = true,
-    val searchLetterboxd: Boolean = true,
+    val searchVimeo: Boolean = true,
     val selectedItem: DiscoverItem? = null,
     val isLoadingDetails: Boolean = false,
     val isSelectedBookmarked: Boolean = false,
@@ -70,7 +70,7 @@ class DiscoverViewModel(
             "movies" -> _uiState.value = _uiState.value.copy(searchMovies = !_uiState.value.searchMovies)
             "anime" -> _uiState.value = _uiState.value.copy(searchAnime = !_uiState.value.searchAnime)
             "tv" -> _uiState.value = _uiState.value.copy(searchTv = !_uiState.value.searchTv)
-            "letterboxd" -> _uiState.value = _uiState.value.copy(searchLetterboxd = !_uiState.value.searchLetterboxd)
+            "vimeo" -> _uiState.value = _uiState.value.copy(searchVimeo = !_uiState.value.searchVimeo)
         }
     }
 
@@ -89,7 +89,7 @@ class DiscoverViewModel(
                     searchMovies = _uiState.value.searchMovies,
                     searchAnime = _uiState.value.searchAnime,
                     searchTv = _uiState.value.searchTv,
-                    searchLbx = _uiState.value.searchLetterboxd
+                    searchVimeo = _uiState.value.searchVimeo
                 )
                 _uiState.value = _uiState.value.copy(
                     searchResults = results,
