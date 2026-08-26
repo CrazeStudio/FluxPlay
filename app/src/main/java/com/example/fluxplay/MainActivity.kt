@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -166,23 +167,16 @@ fun FluxplayMainApp(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(
-                                                MaterialTheme.colorScheme.primary,
-                                                MaterialTheme.colorScheme.tertiary
-                                            )
-                                        )
-                                    ),
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF141416)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
+                                    painter = painterResource(id = R.drawable.ic_fluxplay_logo),
+                                    contentDescription = "Fluxplay Logo",
+                                    tint = Color.Unspecified,
+                                    modifier = Modifier.size(30.dp)
                                 )
                             }
                             Spacer(Modifier.width(10.dp))
