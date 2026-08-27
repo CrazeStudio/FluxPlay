@@ -1,22 +1,23 @@
 package com.example.fluxplay.data.db
 
 import androidx.room.TypeConverter
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 class Converters {
-    private val json = Json { ignoreUnknownKeys = true }
+    private val gson = Gson()
 
     @TypeConverter
     fun fromStringList(value: List<String>?): String {
-        return value?.let { json.encodeToString(it) } ?: "[]"
+        return gson.toJson(value ?: emptyList<String>())
     }
 
     @TypeConverter
     fun toStringList(value: String?): List<String> {
         if (value.isNullOrEmpty()) return emptyList()
+        val listType = object : TypeToken<List<String>>() {}.type
         return try {
-            json.decodeFromString(value)
+            gson.fromJson(value, listType) ?: emptyList()
         } catch (e: Exception) {
             emptyList()
         }

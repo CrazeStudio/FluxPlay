@@ -7,14 +7,9 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.example.fluxplay.data.model.MediaItemEntity
 
-@Database(
-    entities = [MediaItemEntity::class],
-    version = 1,
-    exportSchema = false
-)
+@Database(entities = [MediaItemEntity::class], version = 1, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class FluxplayDatabase : RoomDatabase() {
-
     abstract fun mediaDao(): MediaDao
 
     companion object {
@@ -27,9 +22,7 @@ abstract class FluxplayDatabase : RoomDatabase() {
                     context.applicationContext,
                     FluxplayDatabase::class.java,
                     "fluxplay_database"
-                )
-                    .fallbackToDestructiveMigration()
-                    .build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }

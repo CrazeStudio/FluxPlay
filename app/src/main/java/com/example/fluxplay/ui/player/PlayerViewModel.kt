@@ -1,18 +1,11 @@
 package com.example.fluxplay.ui.player
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
-import android.util.Log
-import androidx.annotation.OptIn
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.PlaybackParameters
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.*
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -20,18 +13,13 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
-import androidx.media3.exoplayer.upstream.DefaultAllocator
-import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
-import androidx.media3.session.MediaSession
-import com.example.fluxplay.data.cache.FluxplayMediaCache
-import com.example.fluxplay.data.model.DiscoverItem
+import androidx.media3.ui.AspectRatioFrameLayout
 import com.example.fluxplay.data.model.MediaItemEntity
+import com.example.fluxplay.data.model.PlayerEngine
+import com.example.fluxplay.data.model.PlayerSettings
 import com.example.fluxplay.data.repository.MediaRepository
-import com.example.fluxplay.data.repository.MetadataRepository
 import com.example.fluxplay.data.repository.SettingsRepository
-import com.example.fluxplay.service.PlaybackService
-import kotlinx.coroutines.Dispatchers
+import com.example.fluxplay.service.PlaybackNotificationHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,638 +27,624 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.net.URLDecoder
+
+enum class VideoResizeMode(val displayName: String, val exoMode: Int) {
+    FIT("Fit", AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    ZOOM("Zoom / Fill", AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
+    STRETCH("Stretch", AspectRatioFrameLayout.RESIZE_MODE_FILL),
+    FIXED_16_9("16:9", AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH)
+}
+
+data class TrackItem(
+    val id: String,
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val name: String,
+    val language: String,
+    val isSelected: Boolean
+)
+
+data class VideoQualityItem(
+    val width: Int,
+    val height: Int,
+    val bitrate: Int,
+    val label: String,
+    val isSelected: Boolean
+)
 
 data class PlayerUiState(
-    val currentUrl: String = "",
     val currentMedia: MediaItemEntity? = null,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
-    val currentPositionMs: Long = 0,
-    val durationMs: Long = 0,
-    val bufferedPositionMs: Long = 0,
+    val playbackError: String? = null,
+    val currentPositionMs: Long = 0L,
+    val durationMs: Long = 0L,
+    val bufferedPositionMs: Long = 0L,
     val playbackSpeed: Float = 1.0f,
     val isMuted: Boolean = false,
+    val volumeLevel: Float = 1.0f, // 0.0 to 1.5 (boost)
+    val brightnessLevel: Float = 0.5f,
+    val gestureIndicatorText: String? = null,
     val isFullscreen: Boolean = false,
-    val aspectRatioMode: String = "contain", // "contain", "cover", "fill"
-    val showControls: Boolean = true,
-    val showSkipLeft: Boolean = false,
-    val showSkipRight: Boolean = false,
-    val statusText: String = "Ready",
-    val statusType: String = "", // "", "live", "warning", "error"
-    val cachedBytes: Long = 0L,
-    val totalCacheSizeBytes: Long = 0L,
-    val isBookmarked: Boolean = false,
-    val playerType: String = "builtin", // "builtin", "jwplayer"
-    val error: String? = null
+    val isControlsLocked: Boolean = false,
+    val areControlsVisible: Boolean = true,
+    val resizeMode: VideoResizeMode = VideoResizeMode.FIT,
+    val audioTracks: List<TrackItem> = emptyList(),
+    val subtitleTracks: List<TrackItem> = emptyList(),
+    val videoQualities: List<VideoQualityItem> = emptyList(),
+    val selectedAudioTrackName: String = "Default",
+    val selectedSubtitleTrackName: String = "Off",
+    val selectedQualityLabel: String = "Auto",
+    val selectedEngine: PlayerEngine = PlayerEngine.EXOPLAYER,
+    val streamTelemetry: String = "",
+    val settings: PlayerSettings = PlayerSettings()
 )
 
-@OptIn(UnstableApi::class)
 class PlayerViewModel(
     application: Application,
     private val mediaRepository: MediaRepository,
-    private val settingsRepository: SettingsRepository,
-    private val metadataRepository: MetadataRepository = MetadataRepository(settingsRepository)
+    private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
-
-    // High bandwidth estimation for instant max-speed chunk fetching
-    private val bandwidthMeter = DefaultBandwidthMeter.Builder(application)
-        .setInitialBitrateEstimate(50_000_000L)
-        .build()
-
-    // Ultra-responsive, highly reliable LoadControl: instant 400ms startup with deep 15s-50s anti-stutter buffer
-    private val loadControl = DefaultLoadControl.Builder()
-        .setAllocator(DefaultAllocator(true, 64 * 1024))
-        .setBufferDurationsMs(
-            /* minBufferMs = */ 15000,
-            /* maxBufferMs = */ 50000,
-            /* bufferForPlaybackMs = */ 400,
-            /* bufferForPlaybackAfterRebufferMs = */ 800
-        )
-        .setBackBuffer(
-            /* backBufferDurationMs = */ 10000,
-            /* retainBackBufferFromKeyframe = */ true
-        )
-        .setPrioritizeTimeOverSizeThresholds(true)
-        .build()
-
-    // High throughput Media DataSource with Keep-Alive
-    private val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-        .setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile; Fluxplay Native Engine)")
-        .setConnectTimeoutMs(8000)
-        .setReadTimeoutMs(15000)
-        .setAllowCrossProtocolRedirects(true)
-        .setTransferListener(bandwidthMeter)
-        .setDefaultRequestProperties(
-            mapOf(
-                "Connection" to "keep-alive"
-            )
-        )
-
-    private val upstreamDataSourceFactory = DefaultDataSource.Factory(application, httpDataSourceFactory)
-
-    // Progressive Cache DataSource: Downloads & plays simultaneously, caching stream data to disk
-    private val cacheDataSourceFactory = FluxplayMediaCache.createCacheDataSourceFactory(
-        application,
-        upstreamDataSourceFactory
-    )
-
-    private val mediaSourceFactory = DefaultMediaSourceFactory(application)
-        .setDataSourceFactory(cacheDataSourceFactory)
-
-    private val renderersFactory = DefaultRenderersFactory(application)
-        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-        .setEnableDecoderFallback(true)
-        .setAllowedVideoJoiningTimeMs(5000)
-
-    private val trackSelector = DefaultTrackSelector(application).apply {
-        setParameters(
-            buildUponParameters()
-                .setAllowVideoMixedMimeTypeAdaptiveness(true)
-                .setAllowVideoNonSeamlessAdaptiveness(true)
-                .setExceedRendererCapabilitiesIfNecessary(true)
-                .setTunnelingEnabled(false)
-        )
-    }
-
-    private val audioAttributes = AudioAttributes.Builder()
-        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-        .setUsage(C.USAGE_MEDIA)
-        .build()
-
-    val exoPlayer: ExoPlayer = ExoPlayer.Builder(application, renderersFactory)
-        .setMediaSourceFactory(mediaSourceFactory)
-        .setLoadControl(loadControl)
-        .setBandwidthMeter(bandwidthMeter)
-        .setTrackSelector(trackSelector)
-        .setSeekBackIncrementMs(10000)
-        .setSeekForwardIncrementMs(10000)
-        .setAudioAttributes(audioAttributes, true)
-        .setWakeMode(C.WAKE_MODE_LOCAL)
-        .setHandleAudioBecomingNoisy(true)
-        .setSeekParameters(SeekParameters.EXACT)
-        .build()
-
-    private var mediaSession: MediaSession? = null
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+    private var exoPlayer: ExoPlayer? = null
     private var progressTrackingJob: Job? = null
+    private var gestureIndicatorDismissJob: Job? = null
     private var controlsHideJob: Job? = null
 
     init {
-        try {
-            mediaSession = MediaSession.Builder(application, exoPlayer)
-                .setId("fluxplay_media_session")
-                .build()
-            PlaybackService.setMediaSession(mediaSession)
-        } catch (e: Exception) {
-            Log.e("PlayerViewModel", "Error creating MediaSession", e)
-        }
+        initExoPlayer()
 
-        PlaybackService.setPlaybackControlListener(object : PlaybackService.PlaybackControlListener {
-            override fun onTogglePlayPause() {
-                togglePlayPause()
-            }
-
-            override fun onSkip(seconds: Int) {
-                skip(seconds)
-            }
-
-            override fun onStopPlayback() {
-                stop()
-            }
-        })
-
-        exoPlayer.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _uiState.value = _uiState.value.copy(
-                    isPlaying = isPlaying,
-                    statusText = if (isPlaying) "Playing" else "Paused",
-                    statusType = if (isPlaying) "live" else ""
-                )
-                notifyPlaybackService(isPlaying)
-                if (isPlaying) {
-                    startProgressTracker()
-                    scheduleHideControls()
-                } else {
-                    stopProgressTracker()
-                }
-            }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_BUFFERING -> {
-                        _uiState.value = _uiState.value.copy(
-                            isBuffering = true,
-                            statusText = "Buffering...",
-                            statusType = "warning"
-                        )
-                    }
-                    Player.STATE_READY -> {
-                        val duration = exoPlayer.duration.coerceAtLeast(0)
-                        _uiState.value = _uiState.value.copy(
-                            isBuffering = false,
-                            durationMs = duration,
-                            statusText = if (exoPlayer.isPlaying) "Playing" else "Ready",
-                            statusType = if (exoPlayer.isPlaying) "live" else ""
-                        )
-                        notifyPlaybackService(exoPlayer.isPlaying)
-                    }
-                    Player.STATE_ENDED -> {
-                        val watchedUrl = _uiState.value.currentUrl
-                        _uiState.value = _uiState.value.copy(
-                            isPlaying = false,
-                            isBuffering = false,
-                            statusText = "Completed",
-                            statusType = "",
-                            cachedBytes = 0L
-                        )
-                        if (watchedUrl.isNotBlank()) {
-                            FluxplayMediaCache.removeResourceForUrl(getApplication(), watchedUrl)
-                        }
-                        notifyPlaybackService(false)
-                        stopProgressTracker()
-                    }
-                    Player.STATE_IDLE -> {
-                        _uiState.value = _uiState.value.copy(
-                            isBuffering = false
-                        )
-                    }
-                }
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                Log.e("PlayerViewModel", "Player error: ${error.errorCodeName}", error)
-                val friendlyMessage = when (error.errorCode) {
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Network timeout. Please verify stream URL."
-                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
-                    PlaybackException.ERROR_CODE_PARSING_MANIFEST_UNSUPPORTED -> "Unsupported stream format or codec."
-                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "Server returned an error (404/403/500)."
-                    else -> error.localizedMessage ?: "Playback error occurred"
-                }
-                _uiState.value = _uiState.value.copy(
-                    isBuffering = false,
-                    isPlaying = false,
-                    error = friendlyMessage,
-                    statusText = "Playback Error",
-                    statusType = "error"
-                )
-                notifyPlaybackService(false)
-                stopProgressTracker()
-            }
-        })
-
+        // Sync settings
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _uiState.value = _uiState.value.copy(
-                    playerType = settings.playerType
+                    settings = settings,
+                    selectedEngine = settings.selectedEngine
                 )
             }
         }
-    }
 
-    fun playLocalFile(uri: Uri) {
-        val context: android.content.Context = getApplication()
-        var title = "Local Media"
-        var sizeBytes = 0L
-        try {
-            val cursor = context.contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex != -1) {
-                        val name = it.getString(nameIndex)
-                        if (!name.isNullOrBlank()) title = name
-                    }
-                    val sizeIndex = it.getColumnIndex(android.provider.OpenableColumns.SIZE)
-                    if (sizeIndex != -1) {
-                        sizeBytes = it.getLong(sizeIndex)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("PlayerViewModel", "Error querying uri metadata", e)
-            title = uri.lastPathSegment ?: "Local Media"
-        }
-
-        val isAudio = title.endsWith(".mp3", ignoreCase = true) ||
-                title.endsWith(".m4a", ignoreCase = true) ||
-                title.endsWith(".aac", ignoreCase = true) ||
-                title.endsWith(".flac", ignoreCase = true) ||
-                title.endsWith(".wav", ignoreCase = true) ||
-                title.endsWith(".ogg", ignoreCase = true)
-
-        val formattedSize = if (sizeBytes > 0) formatBytes(sizeBytes) else ""
-        val media = MediaItemEntity(
-            url = uri.toString(),
-            title = title,
-            source = "Local Storage",
-            type = if (isAudio) "Audio" else "Local Video",
-            duration = formattedSize
-        )
-        playUrl(uri.toString(), media)
-    }
-
-    fun setPlayerType(type: String) {
-        settingsRepository.updatePlayerType(type)
-    }
-
-    fun togglePlayerType() {
-        val next = when (_uiState.value.playerType) {
-            "builtin" -> "jwplayer"
-            "jwplayer" -> "vimeo"
-            else -> "builtin"
-        }
-        setPlayerType(next)
-    }
-
-    fun playUrl(url: String, customMedia: MediaItemEntity? = null) {
-        val trimmed = url.trim()
-        if (trimmed.isBlank()) return
-
-        val previousUrl = _uiState.value.currentUrl
-        if (previousUrl.isNotBlank() && previousUrl != trimmed) {
-            FluxplayMediaCache.removeResourceForUrl(getApplication(), previousUrl)
-        }
-
-        val baseMedia = customMedia ?: createDefaultMediaFromUrl(trimmed)
+        // Resume last watched media from DB if available
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                currentUrl = trimmed,
-                currentMedia = baseMedia,
-                isBuffering = true,
-                isPlaying = true,
-                statusText = "Connecting...",
-                statusType = "live",
-                error = null,
-                showControls = true
-            )
-
-            // If it's a Vimeo link and we need resolution
-            var activeMedia = baseMedia
-            var streamToPlay = trimmed
-
-            if (trimmed.contains("vimeo.com", ignoreCase = true)) {
-                _uiState.value = _uiState.value.copy(statusText = "Resolving Vimeo Stream...")
-                val resolved = metadataRepository.resolveVimeoUrl(trimmed)
-                if (resolved != null) {
-                    activeMedia = resolved
-                    streamToPlay = resolved.url
-                }
-            } else {
-                val existing = mediaRepository.getMediaDirect(trimmed)
-                if (existing != null) {
-                    activeMedia = existing
+            mediaRepository.getWatchHistory().collect { historyList ->
+                if (_uiState.value.currentMedia == null && historyList.isNotEmpty()) {
+                    val last = historyList.first()
+                    _uiState.value = _uiState.value.copy(currentMedia = last)
                 }
             }
+        }
 
-            _uiState.value = _uiState.value.copy(
-                currentUrl = streamToPlay,
-                currentMedia = activeMedia,
-                statusText = "Buffering..."
+        // Register notification actions
+        PlaybackNotificationHelper.registerActionListener(getApplication()) { action ->
+            when (action) {
+                PlaybackNotificationHelper.ACTION_PLAY -> exoPlayer?.play()
+                PlaybackNotificationHelper.ACTION_PAUSE -> exoPlayer?.pause()
+                PlaybackNotificationHelper.ACTION_REWIND -> seekRelative(-10000)
+                PlaybackNotificationHelper.ACTION_FORWARD -> seekRelative(10000)
+                PlaybackNotificationHelper.ACTION_STOP -> {
+                    exoPlayer?.pause()
+                    PlaybackNotificationHelper.dismissNotification(getApplication())
+                }
+            }
+        }
+    }
+
+    private fun initExoPlayer() {
+        val app = getApplication<Application>()
+
+        // High-performance direct load control with instant start
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                1500,  // minBufferMs (minimal pre-buffer)
+                15000, // maxBufferMs
+                250,   // bufferForPlaybackMs (instant start in 250ms)
+                500    // bufferForPlaybackAfterRebufferMs (500ms recovery)
             )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
 
-            // Save to history
-            mediaRepository.recordWatch(activeMedia)
+        val renderersFactory = DefaultRenderersFactory(app)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            .setEnableDecoderFallback(true)
 
-            val isLive = streamToPlay.contains(".m3u8", ignoreCase = true) || streamToPlay.contains("live", ignoreCase = true)
-            val isCurrentBookmarked = activeMedia.isBookmarked
-            _uiState.value = _uiState.value.copy(isBookmarked = isCurrentBookmarked)
-            val mediaItem = MediaItem.Builder()
-                .setUri(Uri.parse(streamToPlay))
-                .apply {
-                    if (isLive) {
-                        setLiveConfiguration(
-                            MediaItem.LiveConfiguration.Builder()
-                                .setTargetOffsetMs(1000)
-                                .setMinOffsetMs(200)
-                                .setMaxOffsetMs(3000)
-                                .build()
+        val player = ExoPlayer.Builder(app, renderersFactory)
+            .setLoadControl(loadControl)
+            .setSeekParameters(SeekParameters.CLOSEST_SYNC)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .setSeekBackIncrementMs(10000)
+            .setSeekForwardIncrementMs(10000)
+            .build().apply {
+                playWhenReady = true
+                repeatMode = Player.REPEAT_MODE_OFF
+                addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
+                        updatePlaybackNotification()
+                        if (isPlaying) {
+                            scheduleControlsAutoHide()
+                        }
+                    }
+
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        val isBuffering = playbackState == Player.STATE_BUFFERING
+                        val duration = if (duration > 0) duration else 0L
+                        _uiState.value = _uiState.value.copy(
+                            isBuffering = isBuffering,
+                            durationMs = duration
+                        )
+                        if (playbackState == Player.STATE_READY) {
+                            _uiState.value = _uiState.value.copy(playbackError = null)
+                            updateTelemetry()
+                        }
+                        updatePlaybackNotification()
+                    }
+
+                    override fun onTracksChanged(tracks: Tracks) {
+                        extractTracks(tracks)
+                        updateTelemetry()
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        val errorMsg = error.localizedMessage ?: "Playback error (${error.errorCodeName})"
+                        _uiState.value = _uiState.value.copy(
+                            playbackError = errorMsg,
+                            isBuffering = false,
+                            isPlaying = false,
+                            areControlsVisible = true
                         )
                     }
-                }
-                .build()
-
-            exoPlayer.playWhenReady = true
-            exoPlayer.setMediaItem(mediaItem)
-            exoPlayer.prepare()
-
-            if (activeMedia.progressSeconds > 0) {
-                val resumeMs = activeMedia.progressSeconds * 1000
-                exoPlayer.seekTo(resumeMs)
+                })
             }
-            exoPlayer.play()
-
-            notifyPlaybackService(true)
-            scheduleHideControls()
-        }
+        exoPlayer = player
+        startProgressTracking()
     }
 
-    fun playFromDiscover(item: DiscoverItem) {
-        val streamUrl = if (item.trailerUrl.isNotBlank()) item.trailerUrl else item.sourceUrl
-        if (streamUrl.isBlank()) return
-        val media = MediaItemEntity(
-            url = streamUrl,
-            title = item.title,
-            poster = item.poster,
-            year = item.year,
-            type = item.type,
-            rating = item.rating,
-            source = item.source,
-            provider = item.provider,
-            providerId = item.id,
-            synopsis = item.synopsis,
-            duration = item.duration,
-            genres = item.genres,
-            cast = item.characters,
-            studios = item.studios,
-            sourceUrl = item.sourceUrl,
-            trailerUrl = item.trailerUrl
+    fun getExoPlayer(): ExoPlayer? = exoPlayer
+
+    private fun updatePlaybackNotification() {
+        if (!_uiState.value.settings.notificationsEnabled) {
+            PlaybackNotificationHelper.dismissNotification(getApplication())
+            return
+        }
+        val media = _uiState.value.currentMedia ?: return
+        PlaybackNotificationHelper.showPlaybackNotification(
+            context = getApplication(),
+            media = media,
+            isPlaying = _uiState.value.isPlaying,
+            coroutineScope = viewModelScope
         )
-        playUrl(streamUrl, media)
     }
 
-    fun retry() {
-        val currentUrl = _uiState.value.currentUrl
-        if (currentUrl.isNotBlank()) {
-            playUrl(currentUrl, _uiState.value.currentMedia)
-        }
-    }
+    private fun updateTelemetry() {
+        val player = exoPlayer ?: return
+        val format = player.videoFormat
+        val width = format?.width ?: 0
+        val height = format?.height ?: 0
+        val fps = format?.frameRate ?: 0f
+        val codec = format?.sampleMimeType?.substringAfter("/") ?: "Hardware Codec"
+        val bitrateKbps = if ((format?.bitrate ?: 0) > 0) "${format!!.bitrate / 1000} kbps" else "Adaptive Bitrate"
 
-    fun stop() {
-        val currentUrl = _uiState.value.currentUrl
-        exoPlayer.stop()
+        val engineName = _uiState.value.selectedEngine.displayName
+        val resStr = if (height > 0) "${width}x${height}p @ ${fps.toInt()}fps" else "Auto Resolution"
+
         _uiState.value = _uiState.value.copy(
-            isPlaying = false,
-            isBuffering = false,
-            error = null,
-            statusText = "Stopped",
-            statusType = "",
-            cachedBytes = 0L
+            streamTelemetry = "$engineName • $resStr • $codec • $bitrateKbps"
         )
-        if (currentUrl.isNotBlank()) {
-            FluxplayMediaCache.removeResourceForUrl(getApplication(), currentUrl)
+    }
+
+    private fun extractTracks(tracks: Tracks) {
+        val audioList = mutableListOf<TrackItem>()
+        val subtitleList = mutableListOf<TrackItem>()
+        val qualityList = mutableListOf<VideoQualityItem>()
+
+        subtitleList.add(
+            TrackItem(
+                id = "off",
+                groupIndex = -1,
+                trackIndex = -1,
+                name = "Off",
+                language = "",
+                isSelected = true
+            )
+        )
+
+        for (groupIndex in 0 until tracks.groups.size) {
+            val group = tracks.groups[groupIndex]
+            val trackType = group.type
+
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                val isSelected = group.isTrackSelected(trackIndex)
+                val lang = format.language ?: "und"
+                val label = format.label ?: format.id ?: "Track ${trackIndex + 1}"
+
+                when (trackType) {
+                    C.TRACK_TYPE_AUDIO -> {
+                        val audioName = if (format.channelCount > 2) "$label (${format.channelCount}ch / $lang)" else "$label ($lang)"
+                        audioList.add(
+                            TrackItem(
+                                id = "audio_${groupIndex}_$trackIndex",
+                                groupIndex = groupIndex,
+                                trackIndex = trackIndex,
+                                name = audioName,
+                                language = lang,
+                                isSelected = isSelected
+                            )
+                        )
+                    }
+                    C.TRACK_TYPE_TEXT -> {
+                        val subName = if (label.isNotBlank()) "$label ($lang)" else "Subtitle ($lang)"
+                        val item = TrackItem(
+                            id = "sub_${groupIndex}_$trackIndex",
+                            groupIndex = groupIndex,
+                            trackIndex = trackIndex,
+                            name = subName,
+                            language = lang,
+                            isSelected = isSelected
+                        )
+                        subtitleList.add(item)
+                    }
+                    C.TRACK_TYPE_VIDEO -> {
+                        if (format.height > 0) {
+                            val qLabel = "${format.height}p" + if (format.bitrate > 0) " (${format.bitrate / 1000} kbps)" else ""
+                            qualityList.add(
+                                VideoQualityItem(
+                                    width = format.width,
+                                    height = format.height,
+                                    bitrate = format.bitrate,
+                                    label = qLabel,
+                                    isSelected = isSelected
+                                )
+                            )
+                        }
+                    }
+                }
+            }
         }
-        PlaybackService.stop(getApplication())
-        stopProgressTracker()
+
+        val activeAudio = audioList.find { it.isSelected }?.name ?: if (audioList.isNotEmpty()) audioList.first().name else "Default"
+        val activeSub = subtitleList.find { it.isSelected && it.id != "off" }?.name ?: "Off"
+        val activeQuality = qualityList.find { it.isSelected && it.height > 0 }?.label ?: "Auto"
+
+        _uiState.value = _uiState.value.copy(
+            audioTracks = audioList,
+            subtitleTracks = subtitleList,
+            videoQualities = qualityList,
+            selectedAudioTrackName = activeAudio,
+            selectedSubtitleTrackName = activeSub,
+            selectedQualityLabel = activeQuality
+        )
+    }
+
+    private fun startProgressTracking() {
+        progressTrackingJob?.cancel()
+        progressTrackingJob = viewModelScope.launch {
+            while (isActive) {
+                exoPlayer?.let { player ->
+                    val pos = player.currentPosition
+                    val dur = if (player.duration > 0) player.duration else 0L
+                    val buffered = player.bufferedPosition
+                    _uiState.value = _uiState.value.copy(
+                        currentPositionMs = pos,
+                        durationMs = dur,
+                        bufferedPositionMs = buffered
+                    )
+                    if (player.isPlaying && dur > 0) {
+                        _uiState.value.currentMedia?.let { media ->
+                            mediaRepository.updateProgress(
+                                url = media.url,
+                                progress = pos / 1000,
+                                duration = dur / 1000
+                            )
+                        }
+                    }
+                }
+                delay(250)
+            }
+        }
+    }
+
+    fun loadMedia(media: MediaItemEntity) {
+        _uiState.value = _uiState.value.copy(
+            currentMedia = media,
+            playbackError = null,
+            isBuffering = true,
+            areControlsVisible = true
+        )
+        viewModelScope.launch {
+            mediaRepository.saveOrUpdateMedia(media)
+            exoPlayer?.let { player ->
+                try {
+                    val uri = Uri.parse(media.url)
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(uri)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(media.title)
+                                .setDisplayTitle(media.title)
+                                .setArtworkUri(if (media.poster.isNotBlank()) Uri.parse(media.poster) else null)
+                                .build()
+                        )
+                        .build()
+
+                    player.setMediaItem(mediaItem)
+                    player.prepare()
+                    if (media.progressSeconds > 0) {
+                        player.seekTo(media.progressSeconds * 1000)
+                    }
+                    player.play()
+                    updatePlaybackNotification()
+                    scheduleControlsAutoHide()
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        playbackError = "Unable to load media: ${e.localizedMessage}",
+                        isBuffering = false
+                    )
+                }
+            }
+        }
+    }
+
+    fun openLocalFile(uri: Uri, displayName: String) {
+        try {
+            getApplication<Application>().contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (_: Exception) {}
+
+        val item = MediaItemEntity(
+            url = uri.toString(),
+            title = displayName.ifBlank { "Local Offline Video" },
+            poster = "",
+            year = "Offline",
+            type = "Offline Video",
+            source = "Device Storage",
+            provider = "local",
+            providerId = "local_${System.currentTimeMillis()}",
+            synopsis = "Offline video file: $displayName"
+        )
+        loadMedia(item)
+    }
+
+    fun playCustomStream(url: String, title: String = "") {
+        if (url.isBlank()) return
+        val trimmed = url.trim()
+        val streamTitle = if (title.isNotBlank()) title.trim() else {
+            trimmed.substringAfterLast("/").substringBefore("?").ifBlank { "Direct Stream" }
+        }
+        val customItem = MediaItemEntity(
+            url = trimmed,
+            title = streamTitle,
+            poster = "",
+            year = "Stream",
+            type = if (trimmed.contains(".m3u8")) "HLS Stream" else if (trimmed.contains(".mpd")) "DASH Stream" else "Direct Video",
+            rating = "HD",
+            source = "Network Stream",
+            provider = "custom",
+            providerId = "custom_${System.currentTimeMillis()}",
+            synopsis = "Network URL: $trimmed"
+        )
+        loadMedia(customItem)
+    }
+
+    fun retryCurrentMedia() {
+        _uiState.value.currentMedia?.let { loadMedia(it) }
     }
 
     fun togglePlayPause() {
-        if (_uiState.value.currentUrl.isBlank()) return
-        if (exoPlayer.isPlaying) {
-            exoPlayer.pause()
-        } else {
-            exoPlayer.play()
+        exoPlayer?.let { player ->
+            if (player.isPlaying) {
+                player.pause()
+                setControlsVisibility(true)
+            } else {
+                player.play()
+                scheduleControlsAutoHide()
+            }
         }
-        showControlsTemporarily()
+    }
+
+    fun toggleControlsVisibility() {
+        if (_uiState.value.isControlsLocked) return
+        val newVisible = !_uiState.value.areControlsVisible
+        setControlsVisibility(newVisible)
+    }
+
+    fun setControlsVisibility(visible: Boolean) {
+        _uiState.value = _uiState.value.copy(areControlsVisible = visible)
+        controlsHideJob?.cancel()
+        if (visible && _uiState.value.isPlaying) {
+            scheduleControlsAutoHide()
+        }
+    }
+
+    fun scheduleControlsAutoHide() {
+        controlsHideJob?.cancel()
+        controlsHideJob = viewModelScope.launch {
+            delay(4000)
+            if (_uiState.value.isPlaying && !_uiState.value.isControlsLocked) {
+                _uiState.value = _uiState.value.copy(areControlsVisible = false)
+            }
+        }
     }
 
     fun seekTo(positionMs: Long) {
-        val maxDuration = _uiState.value.durationMs.coerceAtLeast(0)
-        val clamped = if (maxDuration > 0) positionMs.coerceIn(0, maxDuration) else positionMs.coerceAtLeast(0)
-        exoPlayer.seekTo(clamped)
-        _uiState.value = _uiState.value.copy(
-            currentPositionMs = clamped
-        )
-        showControlsTemporarily()
+        exoPlayer?.seekTo(positionMs)
+        scheduleControlsAutoHide()
     }
 
-    fun skip(seconds: Int) {
-        val current = _uiState.value.currentPositionMs
-        val duration = _uiState.value.durationMs
-        val target = if (duration > 0) {
-            (current + (seconds * 1000)).coerceIn(0, duration)
-        } else {
-            (current + (seconds * 1000)).coerceAtLeast(0)
+    fun seekRelative(deltaMs: Long) {
+        exoPlayer?.let { player ->
+            val target = (player.currentPosition + deltaMs).coerceIn(0L, if (player.duration > 0) player.duration else Long.MAX_VALUE)
+            player.seekTo(target)
+            val sec = (deltaMs / 1000).toInt()
+            val sign = if (sec > 0) "+$sec" else "$sec"
+            showGestureIndicator("${sign}s")
+            scheduleControlsAutoHide()
         }
-        seekTo(target)
-        _uiState.value = _uiState.value.copy(
-            showSkipLeft = seconds < 0,
-            showSkipRight = seconds > 0
-        )
-        showControlsTemporarily()
-        viewModelScope.launch {
-            delay(700)
-            _uiState.value = _uiState.value.copy(
-                showSkipLeft = false,
-                showSkipRight = false
-            )
-        }
-    }
-
-    fun cycleAspectRatio() {
-        val next = when (_uiState.value.aspectRatioMode) {
-            "contain" -> "cover"
-            "cover" -> "fill"
-            else -> "contain"
-        }
-        _uiState.value = _uiState.value.copy(aspectRatioMode = next)
-        showControlsTemporarily()
     }
 
     fun setPlaybackSpeed(speed: Float) {
-        exoPlayer.playbackParameters = PlaybackParameters(speed)
+        exoPlayer?.setPlaybackSpeed(speed)
         _uiState.value = _uiState.value.copy(playbackSpeed = speed)
-        showControlsTemporarily()
+        showGestureIndicator("${speed}x Speed")
+        scheduleControlsAutoHide()
     }
 
     fun toggleMute() {
         val newMuted = !_uiState.value.isMuted
-        exoPlayer.volume = if (newMuted) 0f else 1f
+        exoPlayer?.volume = if (newMuted) 0f else _uiState.value.volumeLevel.coerceAtMost(1.0f)
         _uiState.value = _uiState.value.copy(isMuted = newMuted)
-        showControlsTemporarily()
+        showGestureIndicator(if (newMuted) "Muted" else "Unmuted")
     }
 
-    fun toggleFullscreen() {
-        _uiState.value = _uiState.value.copy(isFullscreen = !_uiState.value.isFullscreen)
+    fun setVolumeDelta(delta: Float) {
+        val current = _uiState.value.volumeLevel
+        val updated = (current + delta).coerceIn(0.0f, 1.5f)
+        exoPlayer?.volume = updated.coerceAtMost(1.0f)
+        _uiState.value = _uiState.value.copy(volumeLevel = updated, isMuted = updated <= 0.01f)
+        val pct = (updated * 100).toInt()
+        showGestureIndicator("Volume $pct%")
     }
 
-    fun toggleControls() {
-        val next = !_uiState.value.showControls
-        _uiState.value = _uiState.value.copy(showControls = next)
-        if (next && _uiState.value.isPlaying) {
-            scheduleHideControls()
+    fun setBrightnessDelta(delta: Float) {
+        val current = _uiState.value.brightnessLevel
+        val updated = (current + delta).coerceIn(0.05f, 1.0f)
+        _uiState.value = _uiState.value.copy(brightnessLevel = updated)
+        val pct = (updated * 100).toInt()
+        showGestureIndicator("Brightness $pct%")
+    }
+
+    private fun showGestureIndicator(text: String) {
+        _uiState.value = _uiState.value.copy(gestureIndicatorText = text)
+        gestureIndicatorDismissJob?.cancel()
+        gestureIndicatorDismissJob = viewModelScope.launch {
+            delay(1200)
+            _uiState.value = _uiState.value.copy(gestureIndicatorText = null)
         }
     }
 
-    fun showControlsTemporarily() {
-        _uiState.value = _uiState.value.copy(showControls = true)
-        scheduleHideControls()
+    fun setFullscreen(fullscreen: Boolean) {
+        _uiState.value = _uiState.value.copy(isFullscreen = fullscreen, areControlsVisible = true)
+        scheduleControlsAutoHide()
     }
 
-    private fun scheduleHideControls() {
-        controlsHideJob?.cancel()
-        controlsHideJob = viewModelScope.launch {
-            delay(3500)
-            if (_uiState.value.isPlaying) {
-                _uiState.value = _uiState.value.copy(showControls = false)
+    fun toggleFullscreen() {
+        setFullscreen(!_uiState.value.isFullscreen)
+    }
+
+    fun toggleControlsLock() {
+        val locked = !_uiState.value.isControlsLocked
+        _uiState.value = _uiState.value.copy(isControlsLocked = locked, areControlsVisible = !locked)
+        showGestureIndicator(if (locked) "Controls Locked" else "Controls Unlocked")
+    }
+
+    fun cycleResizeMode() {
+        val modes = VideoResizeMode.values()
+        val nextIndex = (modes.indexOf(_uiState.value.resizeMode) + 1) % modes.size
+        _uiState.value = _uiState.value.copy(resizeMode = modes[nextIndex])
+        showGestureIndicator(modes[nextIndex].displayName)
+        scheduleControlsAutoHide()
+    }
+
+    fun setResizeMode(mode: VideoResizeMode) {
+        _uiState.value = _uiState.value.copy(resizeMode = mode)
+        scheduleControlsAutoHide()
+    }
+
+    fun setEngine(engine: PlayerEngine) {
+        settingsRepository.updateEngine(engine)
+        _uiState.value = _uiState.value.copy(selectedEngine = engine)
+        showGestureIndicator("Engine: ${engine.displayName}")
+        updateTelemetry()
+    }
+
+    fun selectAudioTrack(track: TrackItem) {
+        val player = exoPlayer ?: return
+        val currentTracks = player.currentTracks
+        if (track.groupIndex in 0 until currentTracks.groups.size) {
+            val group = currentTracks.groups[track.groupIndex]
+            player.trackSelectionParameters = player.trackSelectionParameters
+                .buildUpon()
+                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, track.trackIndex))
+                .build()
+            _uiState.value = _uiState.value.copy(selectedAudioTrackName = track.name)
+            showGestureIndicator("Audio: ${track.name}")
+        }
+    }
+
+    fun selectSubtitleTrack(track: TrackItem) {
+        val player = exoPlayer ?: return
+        if (track.id == "off") {
+            player.trackSelectionParameters = player.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+            _uiState.value = _uiState.value.copy(selectedSubtitleTrackName = "Off")
+            showGestureIndicator("Subtitles: Off")
+        } else {
+            val currentTracks = player.currentTracks
+            if (track.groupIndex in 0 until currentTracks.groups.size) {
+                val group = currentTracks.groups[track.groupIndex]
+                player.trackSelectionParameters = player.trackSelectionParameters
+                    .buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                    .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, track.trackIndex))
+                    .build()
+                _uiState.value = _uiState.value.copy(selectedSubtitleTrackName = track.name)
+                showGestureIndicator("Subtitles: ${track.name}")
             }
+        }
+    }
+
+    fun selectVideoQuality(quality: VideoQualityItem) {
+        val player = exoPlayer ?: return
+        if (quality.height <= 0) {
+            player.trackSelectionParameters = player.trackSelectionParameters
+                .buildUpon()
+                .clearVideoSizeConstraints()
+                .build()
+            _uiState.value = _uiState.value.copy(selectedQualityLabel = "Auto")
+            showGestureIndicator("Quality: Auto")
+        } else {
+            player.trackSelectionParameters = player.trackSelectionParameters
+                .buildUpon()
+                .setMaxVideoSize(quality.width.coerceAtLeast(1), quality.height)
+                .build()
+            _uiState.value = _uiState.value.copy(selectedQualityLabel = quality.label)
+            showGestureIndicator("Quality: ${quality.label}")
         }
     }
 
     fun toggleBookmark() {
-        val current = _uiState.value.currentMedia ?: return
+        val media = _uiState.value.currentMedia ?: return
         viewModelScope.launch {
-            mediaRepository.toggleBookmark(current)
-            val updated = mediaRepository.getMediaDirect(current.url)
-            _uiState.value = _uiState.value.copy(
-                currentMedia = updated,
-                isBookmarked = updated?.isBookmarked ?: !_uiState.value.isBookmarked
-            )
-        }
-    }
-
-    private fun startProgressTracker() {
-        stopProgressTracker()
-        progressTrackingJob = viewModelScope.launch {
-            while (isActive) {
-                val currentPos = exoPlayer.currentPosition
-                val duration = exoPlayer.duration.coerceAtLeast(0)
-                val buffered = exoPlayer.bufferedPosition
-                val url = _uiState.value.currentUrl
-                val cached = if (url.isNotBlank()) FluxplayMediaCache.getCachedBytesForUrl(getApplication(), url) else 0L
-                val totalCache = FluxplayMediaCache.getTotalCacheSize(getApplication())
-
-                _uiState.value = _uiState.value.copy(
-                    currentPositionMs = currentPos,
-                    durationMs = duration,
-                    bufferedPositionMs = buffered,
-                    cachedBytes = cached,
-                    totalCacheSizeBytes = totalCache
-                )
-
-                if (url.isNotBlank() && duration > 0) {
-                    mediaRepository.updatePlaybackProgress(
-                        url = url,
-                        progressSec = currentPos / 1000,
-                        durationSec = duration / 1000
-                    )
-                }
-                delay(500)
+            mediaRepository.toggleBookmark(media)
+            val updated = mediaRepository.getMediaDirect(media.url)
+            if (updated != null) {
+                _uiState.value = _uiState.value.copy(currentMedia = updated)
             }
         }
-    }
-
-    fun clearMediaCache() {
-        FluxplayMediaCache.clearAllCache(getApplication())
-        _uiState.value = _uiState.value.copy(
-            cachedBytes = 0L,
-            totalCacheSizeBytes = 0L
-        )
-    }
-
-    private fun stopProgressTracker() {
-        progressTrackingJob?.cancel()
-        progressTrackingJob = null
-    }
-
-    private fun createDefaultMediaFromUrl(url: String): MediaItemEntity {
-        var filename = "Direct Stream"
-        try {
-            val uri = Uri.parse(url)
-            val path = uri.path
-            if (!path.isNullOrBlank()) {
-                val rawName = path.substringAfterLast("/")
-                filename = URLDecoder.decode(rawName, "UTF-8")
-                if (filename.length > 40) {
-                    filename = filename.take(37) + "..."
-                }
-            }
-        } catch (e: Exception) {
-            filename = "Direct Stream"
-        }
-        return MediaItemEntity(
-            url = url,
-            title = filename.ifBlank { "Direct Stream" },
-            source = "Direct"
-        )
-    }
-
-    private fun notifyPlaybackService(isPlaying: Boolean) {
-        val state = _uiState.value
-        if (state.currentUrl.isBlank()) return
-        if (!settingsRepository.settings.value.backgroundPlayback) {
-            PlaybackService.stop(getApplication())
-            return
-        }
-
-        val title = state.currentMedia?.title?.ifBlank { "Fluxplay Stream" } ?: "Fluxplay Stream"
-        val subtitle = when {
-            state.currentUrl.contains(".m3u8", ignoreCase = true) -> "HLS Live Stream"
-            state.currentUrl.contains(".mpd", ignoreCase = true) -> "DASH Stream"
-            else -> "Media3 Core"
-        }
-
-        PlaybackService.start(
-            context = getApplication(),
-            title = title,
-            subtitle = subtitle,
-            isPlaying = isPlaying,
-            positionMs = state.currentPositionMs,
-            durationMs = state.durationMs
-        )
     }
 
     override fun onCleared() {
         super.onCleared()
-        val currentUrl = _uiState.value.currentUrl
-        if (currentUrl.isNotBlank()) {
-            FluxplayMediaCache.removeResourceForUrl(getApplication(), currentUrl)
-        }
-        stopProgressTracker()
+        progressTrackingJob?.cancel()
+        gestureIndicatorDismissJob?.cancel()
         controlsHideJob?.cancel()
-        PlaybackService.stop(getApplication())
-        PlaybackService.setMediaSession(null)
-        PlaybackService.setPlaybackControlListener(null)
-        try {
-            mediaSession?.release()
-            mediaSession = null
-        } catch (e: Exception) {
-            Log.e("PlayerViewModel", "Error releasing MediaSession", e)
-        }
-        exoPlayer.release()
+        PlaybackNotificationHelper.unregisterReceiver(getApplication())
+        PlaybackNotificationHelper.dismissNotification(getApplication())
+        exoPlayer?.release()
+        exoPlayer = null
     }
 }

@@ -2,74 +2,86 @@ package com.example.fluxplay.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.fluxplay.data.model.AppSettings
+import com.example.fluxplay.data.model.AppThemeMode
+import com.example.fluxplay.data.model.PlayerEngine
+import com.example.fluxplay.data.model.PlayerSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 class SettingsRepository(context: Context) {
-
     private val prefs: SharedPreferences = context.getSharedPreferences("fluxplay_settings", Context.MODE_PRIVATE)
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
     private val _settings = MutableStateFlow(loadSettings())
-    val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+    val settings: StateFlow<PlayerSettings> = _settings.asStateFlow()
 
-    private fun loadSettings(): AppSettings {
-        return AppSettings(
-            theme = prefs.getString(KEY_THEME, "dark") ?: "dark",
-            primaryColorHex = prefs.getString(KEY_PRIMARY_COLOR, "#A78BFA") ?: "#A78BFA",
-            accentColorHex = prefs.getString(KEY_ACCENT_COLOR, "#F43F5E") ?: "#F43F5E",
-            backgroundPlayback = prefs.getBoolean(KEY_BACKGROUND_PLAYBACK, true),
-            tmdbKey = prefs.getString(KEY_TMDB_KEY, "") ?: "",
-            playerType = prefs.getString(KEY_PLAYER_TYPE, "builtin") ?: "builtin"
+    private fun loadSettings(): PlayerSettings {
+        val engineId = prefs.getString("selected_engine", PlayerEngine.EXOPLAYER.id) ?: PlayerEngine.EXOPLAYER.id
+        val engine = PlayerEngine.values().find { it.id == engineId } ?: PlayerEngine.EXOPLAYER
+        val themeId = prefs.getString("selected_theme", AppThemeMode.AMOLED_MIDNIGHT.id) ?: AppThemeMode.AMOLED_MIDNIGHT.id
+        val theme = AppThemeMode.values().find { it.id == themeId } ?: AppThemeMode.AMOLED_MIDNIGHT
+        val backgroundPlay = prefs.getBoolean("background_play", true)
+        val notifications = prefs.getBoolean("media_notifications", true)
+        val hwAccel = prefs.getBoolean("hardware_accel", true)
+        val autoResume = prefs.getBoolean("auto_resume", true)
+        val audioTrack = prefs.getString("default_audio_track", "Default") ?: "Default"
+        val subtitleTrack = prefs.getString("default_subtitle_track", "Auto") ?: "Auto"
+        val bufferMb = prefs.getInt("buffer_size_mb", 32)
+        val aspectMode = prefs.getString("video_aspect_mode", "Fit Screen") ?: "Fit Screen"
+        val showControls = prefs.getBoolean("show_controls_overlay", true)
+
+        return PlayerSettings(
+            selectedEngine = engine,
+            selectedTheme = theme,
+            backgroundPlayEnabled = backgroundPlay,
+            notificationsEnabled = notifications,
+            hardwareAcceleration = hwAccel,
+            autoResume = autoResume,
+            defaultAudioTrack = audioTrack,
+            defaultSubtitleTrack = subtitleTrack,
+            bufferSizeMb = bufferMb,
+            videoAspectMode = aspectMode,
+            showMediaControlsOverlay = showControls
         )
     }
 
-    fun updateSettings(newSettings: AppSettings) {
-        prefs.edit()
-            .putString(KEY_THEME, newSettings.theme)
-            .putString(KEY_PRIMARY_COLOR, newSettings.primaryColorHex)
-            .putString(KEY_ACCENT_COLOR, newSettings.accentColorHex)
-            .putBoolean(KEY_BACKGROUND_PLAYBACK, newSettings.backgroundPlayback)
-            .putString(KEY_TMDB_KEY, newSettings.tmdbKey)
-            .putString(KEY_PLAYER_TYPE, newSettings.playerType)
-            .apply()
-        _settings.value = newSettings
+    fun updateEngine(engine: PlayerEngine) {
+        prefs.edit().putString("selected_engine", engine.id).apply()
+        _settings.value = _settings.value.copy(selectedEngine = engine)
     }
 
-    fun updatePlayerType(playerType: String) {
-        updateSettings(_settings.value.copy(playerType = playerType))
+    fun updateTheme(theme: AppThemeMode) {
+        prefs.edit().putString("selected_theme", theme.id).apply()
+        _settings.value = _settings.value.copy(selectedTheme = theme)
     }
 
-    fun updateBackgroundPlayback(enabled: Boolean) {
-        updateSettings(_settings.value.copy(backgroundPlayback = enabled))
+    fun updateBackgroundPlay(enabled: Boolean) {
+        prefs.edit().putBoolean("background_play", enabled).apply()
+        _settings.value = _settings.value.copy(backgroundPlayEnabled = enabled)
     }
 
-    fun updateTheme(theme: String) {
-        updateSettings(_settings.value.copy(theme = theme))
+    fun updateNotifications(enabled: Boolean) {
+        prefs.edit().putBoolean("media_notifications", enabled).apply()
+        _settings.value = _settings.value.copy(notificationsEnabled = enabled)
     }
 
-    fun updatePrimaryColor(colorHex: String) {
-        updateSettings(_settings.value.copy(primaryColorHex = colorHex))
+    fun updateHardwareAcceleration(enabled: Boolean) {
+        prefs.edit().putBoolean("hardware_accel", enabled).apply()
+        _settings.value = _settings.value.copy(hardwareAcceleration = enabled)
     }
 
-    fun updateAccentColor(colorHex: String) {
-        updateSettings(_settings.value.copy(accentColorHex = colorHex))
+    fun updateAutoResume(enabled: Boolean) {
+        prefs.edit().putBoolean("auto_resume", enabled).apply()
+        _settings.value = _settings.value.copy(autoResume = enabled)
     }
 
-    fun updateTmdbKey(key: String) {
-        updateSettings(_settings.value.copy(tmdbKey = key.trim()))
+    fun updateAspectMode(mode: String) {
+        prefs.edit().putString("video_aspect_mode", mode).apply()
+        _settings.value = _settings.value.copy(videoAspectMode = mode)
     }
 
-    companion object {
-        private const val KEY_THEME = "theme"
-        private const val KEY_PRIMARY_COLOR = "primary_color"
-        private const val KEY_ACCENT_COLOR = "accent_color"
-        private const val KEY_BACKGROUND_PLAYBACK = "background_playback"
-        private const val KEY_TMDB_KEY = "tmdb_key"
-        private const val KEY_PLAYER_TYPE = "player_type"
+    fun updateBufferSize(mb: Int) {
+        prefs.edit().putInt("buffer_size_mb", mb).apply()
+        _settings.value = _settings.value.copy(bufferSizeMb = mb)
     }
 }

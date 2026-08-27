@@ -2,8 +2,6 @@ package com.example.fluxplay.ui.discover
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.fluxplay.data.model.DiscoverItem
-import com.example.fluxplay.data.model.DiscoverSection
 import com.example.fluxplay.data.model.MediaItemEntity
 import com.example.fluxplay.data.repository.MediaRepository
 import com.example.fluxplay.data.repository.MetadataRepository
@@ -11,21 +9,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 data class DiscoverUiState(
-    val homeSections: List<DiscoverSection> = emptyList(),
-    val isLoadingHome: Boolean = false,
+    val allStreams: List<MediaItemEntity> = emptyList(),
+    val filteredStreams: List<MediaItemEntity> = emptyList(),
     val searchQuery: String = "",
-    val searchResults: List<DiscoverItem> = emptyList(),
-    val isSearching: Boolean = false,
-    val searchMovies: Boolean = true,
-    val searchAnime: Boolean = true,
-    val searchTv: Boolean = true,
-    val searchVimeo: Boolean = true,
-    val selectedItem: DiscoverItem? = null,
-    val isLoadingDetails: Boolean = false,
-    val isSelectedBookmarked: Boolean = false,
-    val error: String? = null
+    val selectedFilter: String = "all", // "all", "hls", "direct", "local", "iptv"
+    val isLoading: Boolean = false,
+    val importMessage: String? = null
 )
 
 class DiscoverViewModel(
@@ -36,123 +29,124 @@ class DiscoverViewModel(
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
 
+    private val httpClient = OkHttpClient.Builder().build()
+
     init {
-        loadHomeFeed()
+        observeStreams()
     }
 
-    fun loadHomeFeed() {
+    private fun observeStreams() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingHome = true, error = null)
-            try {
-                val sections = metadataRepository.getHomeSections()
-                _uiState.value = _uiState.value.copy(
-                    homeSections = sections,
-                    isLoadingHome = false
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoadingHome = false,
-                    error = "Failed to load home feed: ${e.message}"
-                )
+            mediaRepository.getAllStreams().collect { streams ->
+                _uiState.value = _uiState.value.copy(allStreams = streams)
+                applyFilterAndSearch()
             }
         }
     }
 
-    fun updateSearchQuery(query: String) {
+    fun onSearchQueryChanged(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
-        if (query.isBlank()) {
-            _uiState.value = _uiState.value.copy(searchResults = emptyList())
-        }
+        applyFilterAndSearch()
     }
 
-    fun toggleFilter(filter: String) {
-        when (filter) {
-            "movies" -> _uiState.value = _uiState.value.copy(searchMovies = !_uiState.value.searchMovies)
-            "anime" -> _uiState.value = _uiState.value.copy(searchAnime = !_uiState.value.searchAnime)
-            "tv" -> _uiState.value = _uiState.value.copy(searchTv = !_uiState.value.searchTv)
-            "vimeo" -> _uiState.value = _uiState.value.copy(searchVimeo = !_uiState.value.searchVimeo)
-        }
+    fun onFilterChanged(filter: String) {
+        _uiState.value = _uiState.value.copy(selectedFilter = filter)
+        applyFilterAndSearch()
     }
 
-    fun performSearch() {
-        val query = _uiState.value.searchQuery.trim()
-        if (query.isBlank()) {
-            _uiState.value = _uiState.value.copy(searchResults = emptyList())
-            return
-        }
+    private fun applyFilterAndSearch() {
+        val query = _uiState.value.searchQuery.trim().lowercase()
+        val filter = _uiState.value.selectedFilter
 
+        val filtered = _uiState.value.allStreams.filter { item ->
+            val matchesQuery = query.isBlank() ||
+                item.title.lowercase().contains(query) ||
+                item.url.lowercase().contains(query) ||
+                item.type.lowercase().contains(query)
+
+            val matchesFilter = when (filter) {
+                "hls" -> item.url.contains(".m3u8", ignoreCase = true) || item.type.contains("HLS", ignoreCase = true)
+                "direct" -> item.type.contains("Direct", ignoreCase = true) || item.url.endsWith(".mp4", ignoreCase = true) || item.url.endsWith(".mkv", ignoreCase = true)
+                "local" -> item.provider == "local" || item.url.startsWith("content://") || item.url.startsWith("file://")
+                "iptv" -> item.provider == "playlist" || item.source == "Playlist"
+                else -> true
+            }
+
+            matchesQuery && matchesFilter
+        }
+        _uiState.value = _uiState.value.copy(filteredStreams = filtered)
+    }
+
+    fun addStream(url: String, title: String) {
+        if (url.isBlank()) return
+        val trimmed = url.trim()
+        val streamTitle = title.ifBlank {
+            trimmed.substringAfterLast("/").substringBefore("?").ifBlank { "Stream" }
+        }
+        val item = MediaItemEntity(
+            url = trimmed,
+            title = streamTitle,
+            poster = "",
+            year = "Stream",
+            type = if (trimmed.contains(".m3u8")) "HLS Stream" else if (trimmed.contains(".mpd")) "DASH Stream" else "Direct Video",
+            rating = "HD",
+            source = "Saved Stream",
+            provider = "custom",
+            providerId = "custom_${System.currentTimeMillis()}",
+            synopsis = "Saved network stream."
+        )
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearching = true, error = null)
+            mediaRepository.saveOrUpdateMedia(item)
+        }
+    }
+
+    fun importM3uUrl(m3uUrl: String) {
+        if (m3uUrl.isBlank()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, importMessage = null)
             try {
-                val results = metadataRepository.searchAll(
-                    query = query,
-                    searchMovies = _uiState.value.searchMovies,
-                    searchAnime = _uiState.value.searchAnime,
-                    searchTv = _uiState.value.searchTv,
-                    searchVimeo = _uiState.value.searchVimeo
-                )
+                val request = Request.Builder().url(m3uUrl.trim()).build()
+                val response = httpClient.newCall(request).execute()
+                val body = response.body?.string() ?: ""
+                val count = mediaRepository.importM3uPlaylist(body)
                 _uiState.value = _uiState.value.copy(
-                    searchResults = results,
-                    isSearching = false
+                    isLoading = false,
+                    importMessage = "Successfully imported $count streams!"
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
-                    isSearching = false,
-                    error = "Search failed: ${e.message}"
+                    isLoading = false,
+                    importMessage = "Import failed: ${e.localizedMessage ?: "Invalid URL"}"
                 )
             }
         }
     }
 
-    fun selectItem(item: DiscoverItem) {
+    fun importM3uText(content: String) {
+        if (content.isBlank()) return
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, importMessage = null)
+            val count = mediaRepository.importM3uPlaylist(content)
             _uiState.value = _uiState.value.copy(
-                selectedItem = item,
-                isLoadingDetails = true
-            )
-
-            // Check bookmark status
-            val checkUrl = item.trailerUrl.ifBlank { item.sourceUrl.ifBlank { "${item.provider}:${item.id}" } }
-            val existing = mediaRepository.getMediaDirect(checkUrl)
-            _uiState.value = _uiState.value.copy(isSelectedBookmarked = existing?.isBookmarked == true)
-
-            val fullDetails = metadataRepository.getItemDetails(item.provider, item.id) ?: item
-            _uiState.value = _uiState.value.copy(
-                selectedItem = fullDetails,
-                isLoadingDetails = false
+                isLoading = false,
+                importMessage = "Successfully imported $count streams!"
             )
         }
     }
 
-    fun dismissDetailSheet() {
-        _uiState.value = _uiState.value.copy(selectedItem = null)
+    fun deleteStream(item: MediaItemEntity) {
+        viewModelScope.launch {
+            mediaRepository.deleteMedia(item.url)
+        }
     }
 
-    fun toggleBookmarkSelected() {
-        val item = _uiState.value.selectedItem ?: return
+    fun toggleBookmark(item: MediaItemEntity) {
         viewModelScope.launch {
-            val url = item.trailerUrl.ifBlank { item.sourceUrl.ifBlank { "${item.provider}:${item.id}" } }
-            val entity = MediaItemEntity(
-                url = url,
-                title = item.title,
-                poster = item.poster,
-                year = item.year,
-                type = item.type,
-                rating = item.rating,
-                source = item.source,
-                provider = item.provider,
-                providerId = item.id,
-                synopsis = item.synopsis,
-                duration = item.duration,
-                genres = item.genres,
-                cast = item.characters,
-                studios = item.studios,
-                sourceUrl = item.sourceUrl,
-                trailerUrl = item.trailerUrl
-            )
-            mediaRepository.toggleBookmark(entity)
-            val updated = mediaRepository.getMediaDirect(url)
-            _uiState.value = _uiState.value.copy(isSelectedBookmarked = updated?.isBookmarked == true)
+            mediaRepository.toggleBookmark(item)
         }
+    }
+
+    fun clearImportMessage() {
+        _uiState.value = _uiState.value.copy(importMessage = null)
     }
 }

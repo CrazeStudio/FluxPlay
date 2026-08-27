@@ -1,6 +1,6 @@
 {
   "name": "Fluxplay",
-  "description": "Video streaming player with multi-source metadata discovery for Movies, TV Shows, Anime, Vimeo, and Letterboxd.",
+  "description": "High-performance video and stream player supporting HLS, DASH, MP4, local video playback, M3U playlists, gestures, and audio/subtitle tracks.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -7,12 +7,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <application
-        android:name=".FluxplayApp"
+        android:name="com.example.fluxplay.FluxplayApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -21,9 +23,10 @@
         android:theme="@style/Theme.Fluxplay"
         android:usesCleartextTraffic="true">
         <activity
-            android:name=".MainActivity"
+            android:name="com.example.fluxplay.MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
+            android:supportsPictureInPicture="true"
             android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:theme="@style/Theme.Fluxplay">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -32,7 +35,7 @@
         </activity>
 
         <service
-            android:name=".service.PlaybackService"
+            android:name="com.example.fluxplay.service.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>

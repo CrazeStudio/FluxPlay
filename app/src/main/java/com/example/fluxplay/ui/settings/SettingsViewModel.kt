@@ -1,111 +1,211 @@
 package com.example.fluxplay.ui.settings
 
-import android.content.Context
-import android.net.Uri
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.fluxplay.data.model.AppSettings
+import coil.Coil
+import com.example.fluxplay.data.model.AppThemeMode
 import com.example.fluxplay.data.model.BackupData
+import com.example.fluxplay.data.model.PlayerEngine
+import com.example.fluxplay.data.model.PlayerSettings
 import com.example.fluxplay.data.repository.MediaRepository
 import com.example.fluxplay.data.repository.SettingsRepository
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.File
 
 class SettingsViewModel(
+    application: Application,
     private val settingsRepository: SettingsRepository,
     private val mediaRepository: MediaRepository
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
-    val settings: StateFlow<AppSettings> = settingsRepository.settings
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AppSettings()
-        )
+    val settings: StateFlow<PlayerSettings> = settingsRepository.settings
+    private val gson = Gson()
 
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val _cacheSizeBytes = MutableStateFlow(0L)
+    val cacheSizeBytes: StateFlow<Long> = _cacheSizeBytes.asStateFlow()
 
-    fun updateBackgroundPlayback(enabled: Boolean) {
-        settingsRepository.updateBackgroundPlayback(enabled)
+    private val _cacheSizeFormatted = MutableStateFlow("Calculating...")
+    val cacheSizeFormatted: StateFlow<String> = _cacheSizeFormatted.asStateFlow()
+
+    private val _isCleaningCache = MutableStateFlow(false)
+    val isCleaningCache: StateFlow<Boolean> = _isCleaningCache.asStateFlow()
+
+    private val _cacheCleanMessage = MutableStateFlow<String?>(null)
+    val cacheCleanMessage: StateFlow<String?> = _cacheCleanMessage.asStateFlow()
+
+    init {
+        refreshCacheSize()
     }
 
-    fun updatePlayerType(playerType: String) {
-        settingsRepository.updatePlayerType(playerType)
-    }
-
-    fun updateTheme(theme: String) {
-        settingsRepository.updateTheme(theme)
-    }
-
-    fun updatePrimaryColor(colorHex: String) {
-        settingsRepository.updatePrimaryColor(colorHex)
-    }
-
-    fun updateAccentColor(colorHex: String) {
-        settingsRepository.updateAccentColor(colorHex)
-    }
-
-    fun updateTmdbKey(key: String) {
-        settingsRepository.updateTmdbKey(key)
-    }
-
-    suspend fun createBackupJson(): String = withContext(Dispatchers.IO) {
-        val history = mediaRepository.watchHistory.first()
-        val bookmarks = mediaRepository.bookmarks.first()
-        val currentSettings = settingsRepository.settings.value
-
-        val backup = BackupData(
-            history = history,
-            bookmarks = bookmarks,
-            settings = currentSettings
-        )
-        json.encodeToString(backup)
-    }
-
-    fun restoreBackup(context: Context, uri: Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun refreshCacheSize() {
         viewModelScope.launch(Dispatchers.IO) {
+            val totalBytes = calculateTotalCacheBytes()
+            _cacheSizeBytes.value = totalBytes
+            _cacheSizeFormatted.value = formatBytes(totalBytes)
+        }
+    }
+
+    private fun calculateTotalCacheBytes(): Long {
+        val app = getApplication<Application>()
+        var total = 0L
+        try {
+            app.cacheDir?.let { total += getDirSize(it) }
+            app.codeCacheDir?.let { total += getDirSize(it) }
+            app.externalCacheDir?.let { total += getDirSize(it) }
+        } catch (_: Exception) {}
+        return total
+    }
+
+    private fun getDirSize(dir: File): Long {
+        var size = 0L
+        try {
+            val files = dir.listFiles() ?: return 0L
+            for (file in files) {
+                size += if (file.isDirectory) getDirSize(file) else file.length()
+            }
+        } catch (_: Exception) {}
+        return size
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes >= 1024 * 1024 * 1024 -> String.format("%.2f GB", bytes.toDouble() / (1024 * 1024 * 1024))
+            bytes >= 1024 * 1024 -> String.format("%.2f MB", bytes.toDouble() / (1024 * 1024))
+            bytes >= 1024 -> String.format("%.2f KB", bytes.toDouble() / 1024)
+            else -> "$bytes B"
+        }
+    }
+
+    fun cleanCache(onComplete: ((freedFormatted: String) -> Unit)? = null) {
+        if (_isCleaningCache.value) return
+        _isCleaningCache.value = true
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val initialBytes = calculateTotalCacheBytes()
+
             try {
-                val inputStream = context.contentResolver.openInputStream(uri) ?: throw Exception("Cannot open file")
-                val reader = BufferedReader(InputStreamReader(inputStream))
-                val content = reader.readText()
-                reader.close()
+                // Clear Coil memory and disk caches
+                try {
+                    val imageLoader = Coil.imageLoader(app)
+                    imageLoader.memoryCache?.clear()
+                    imageLoader.diskCache?.clear()
+                } catch (_: Exception) {}
 
-                val backup = json.decodeFromString<BackupData>(content)
-                
-                // Restore settings
-                settingsRepository.updateSettings(backup.settings)
-
-                // Restore database
-                val allItems = (backup.history + backup.bookmarks).distinctBy { it.url }
-                if (allItems.isNotEmpty()) {
-                    mediaRepository.insertAll(allItems)
+                // Delete cache directory contents
+                app.cacheDir?.listFiles()?.forEach { file ->
+                    try {
+                        if (file.isDirectory) file.deleteRecursively() else file.delete()
+                    } catch (_: Exception) {}
                 }
 
-                withContext(Dispatchers.Main) {
-                    onSuccess()
+                app.externalCacheDir?.listFiles()?.forEach { file ->
+                    try {
+                        if (file.isDirectory) file.deleteRecursively() else file.delete()
+                    } catch (_: Exception) {}
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    onError(e.localizedMessage ?: "Failed to restore backup")
-                }
+            } catch (_: Exception) {}
+
+            val remainingBytes = calculateTotalCacheBytes()
+            val freedBytes = (initialBytes - remainingBytes).coerceAtLeast(0L)
+            val freedFormatted = formatBytes(if (freedBytes > 0) freedBytes else initialBytes)
+
+            _cacheSizeBytes.value = remainingBytes
+            _cacheSizeFormatted.value = formatBytes(remainingBytes)
+            _isCleaningCache.value = false
+            _cacheCleanMessage.value = "Successfully cleaned $freedFormatted of cache"
+
+            withContext(Dispatchers.Main) {
+                onComplete?.invoke(freedFormatted)
             }
         }
     }
 
-    fun clearAllData(onComplete: () -> Unit) {
+    fun dismissCacheMessage() {
+        _cacheCleanMessage.value = null
+    }
+
+    fun setEngine(engine: PlayerEngine) {
+        settingsRepository.updateEngine(engine)
+    }
+
+    fun setTheme(theme: AppThemeMode) {
+        settingsRepository.updateTheme(theme)
+    }
+
+    fun setBackgroundPlay(enabled: Boolean) {
+        settingsRepository.updateBackgroundPlay(enabled)
+    }
+
+    fun setNotifications(enabled: Boolean) {
+        settingsRepository.updateNotifications(enabled)
+    }
+
+    fun setHardwareAcceleration(enabled: Boolean) {
+        settingsRepository.updateHardwareAcceleration(enabled)
+    }
+
+    fun setAutoResume(enabled: Boolean) {
+        settingsRepository.updateAutoResume(enabled)
+    }
+
+    fun setAspectMode(mode: String) {
+        settingsRepository.updateAspectMode(mode)
+    }
+
+    fun setBufferSize(mb: Int) {
+        settingsRepository.updateBufferSize(mb)
+    }
+
+    suspend fun createBackupJson(): String {
+        val history = mediaRepository.getWatchHistory().first()
+        val bookmarks = mediaRepository.getBookmarks().first()
+        val combined = (history + bookmarks).distinctBy { it.url }
+        val backup = BackupData(items = combined)
+        return gson.toJson(backup)
+    }
+
+    fun restoreBackup(json: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val backup = gson.fromJson(json, BackupData::class.java)
+                if (backup?.items != null) {
+                    for (item in backup.items) {
+                        mediaRepository.saveOrUpdateMedia(item)
+                    }
+                    onComplete(true)
+                } else {
+                    onComplete(false)
+                }
+            } catch (e: Exception) {
+                onComplete(false)
+            }
+        }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            mediaRepository.clearHistory()
+        }
+    }
+
+    fun clearBookmarks() {
+        viewModelScope.launch {
+            mediaRepository.clearBookmarks()
+        }
+    }
+
+    fun clearAllData() {
         viewModelScope.launch {
             mediaRepository.clearAll()
-            settingsRepository.updateSettings(AppSettings())
-            onComplete()
         }
     }
 }

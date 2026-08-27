@@ -1,328 +1,355 @@
 package com.example.fluxplay.ui.discover
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import com.example.fluxplay.data.model.DiscoverItem
+import com.example.fluxplay.data.model.MediaItemEntity
+import com.example.fluxplay.ui.player.getFileName
+import com.example.fluxplay.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(
     viewModel: DiscoverViewModel,
-    onPlayMedia: (DiscoverItem) -> Unit,
+    onPlayMedia: (MediaItemEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val clipboardManager = LocalClipboardManager.current
-    val hapticFeedback = LocalHapticFeedback.current
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
-    LazyColumn(
+    var showAddStreamDialog by remember { mutableStateOf(false) }
+    var showImportM3uDialog by remember { mutableStateOf(false) }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val fileName = getFileName(context, it)
+            val item = MediaItemEntity(
+                url = it.toString(),
+                title = fileName,
+                poster = "",
+                year = "Local",
+                type = "Local File",
+                source = "Device Storage",
+                provider = "local",
+                providerId = "local_${System.currentTimeMillis()}"
+            )
+            onPlayMedia(item)
+        }
+    }
+
+    LaunchedEffect(state.importMessage) {
+        state.importMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            viewModel.clearImportMessage()
+        }
+    }
+
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 14.dp),
-        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        // Search Header Card
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("discover_search_card"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outline
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+        // Top Bar & Action Bar
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Discover & Search",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
                     Text(
-                        text = "Instant fast search across TMDB, TVMaze, Jikan Anime, and Open Movie databases.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Streams & Library",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.Bold
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = uiState.searchQuery,
-                            onValueChange = { viewModel.updateSearchQuery(it) },
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        IconButton(
+                            onClick = { showAddStreamDialog = true },
                             modifier = Modifier
-                                .weight(1f)
-                                .testTag("discover_search_input"),
-                            placeholder = { Text("Search Movies, Anime, TV, Vimeo...", fontSize = 13.sp) },
-                            singleLine = true,
-                            trailingIcon = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (uiState.searchQuery.isNotBlank()) {
-                                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(18.dp))
-                                        }
-                                    }
-                                    IconButton(onClick = {
-                                        val clip = clipboardManager.getText()?.text?.trim()
-                                        if (!clip.isNullOrBlank()) {
-                                            viewModel.updateSearchQuery(clip)
-                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.performSearch()
-                                        }
-                                    }) {
-                                        Icon(
-                                            Icons.Default.ContentPaste,
-                                            contentDescription = "Paste & Search",
-                                            tint = Color(0xFFF59E0B),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            keyboardActions = KeyboardActions(onSearch = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.performSearch()
-                            }),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                            )
-                        )
-
-                        Button(
-                            onClick = {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                viewModel.performSearch()
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .height(52.dp)
-                                .testTag("discover_search_button"),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
+                                .background(FluxSurfaceVariantDark, RoundedCornerShape(8.dp))
+                                .size(36.dp)
+                                .testTag("btn_add_stream_url")
                         ) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                            Icon(Icons.Filled.AddLink, contentDescription = "Add Stream", tint = FluxPrimary, modifier = Modifier.size(20.dp))
+                        }
+
+                        IconButton(
+                            onClick = { showImportM3uDialog = true },
+                            modifier = Modifier
+                                .background(FluxSurfaceVariantDark, RoundedCornerShape(8.dp))
+                                .size(36.dp)
+                                .testTag("btn_import_m3u")
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Import M3U", tint = FluxSecondary, modifier = Modifier.size(20.dp))
+                        }
+
+                        IconButton(
+                            onClick = { filePickerLauncher.launch("video/*") },
+                            modifier = Modifier
+                                .background(FluxSurfaceVariantDark, RoundedCornerShape(8.dp))
+                                .size(36.dp)
+                                .testTag("btn_pick_file")
+                        ) {
+                            Icon(Icons.Filled.FolderOpen, contentDescription = "Open File", tint = FluxEmerald, modifier = Modifier.size(20.dp))
                         }
                     }
+                }
 
-                    // Filter Chips Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        FilterChip(
-                            selected = uiState.searchMovies,
-                            onClick = { viewModel.toggleFilter("movies") },
-                            label = { Text("Movies", fontSize = 11.sp) },
-                            leadingIcon = if (uiState.searchMovies) {
-                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(14.dp)) }
-                            } else null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                selectedLabelColor = MaterialTheme.colorScheme.primary
-                            )
-                        )
+                Spacer(modifier = Modifier.height(12.dp))
 
-                        FilterChip(
-                            selected = uiState.searchAnime,
-                            onClick = { viewModel.toggleFilter("anime") },
-                            label = { Text("Anime", fontSize = 11.sp) },
-                            leadingIcon = if (uiState.searchAnime) {
-                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(14.dp)) }
-                            } else null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                selectedLabelColor = MaterialTheme.colorScheme.primary
-                            )
-                        )
+                // Search Bar
+                OutlinedTextField(
+                    value = state.searchQuery,
+                    onValueChange = { viewModel.onSearchQueryChanged(it) },
+                    placeholder = { Text("Search streams or URLs...", color = FluxTextMuted, fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = FluxTextSecondary) },
+                    trailingIcon = {
+                        if (state.searchQuery.isNotBlank()) {
+                            IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                                Icon(Icons.Filled.Clear, contentDescription = "Clear", tint = FluxTextSecondary)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = FluxCardDark,
+                        unfocusedContainerColor = FluxCardDark,
+                        focusedBorderColor = FluxPrimary,
+                        unfocusedBorderColor = Color.Transparent
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("input_search_streams")
+                )
 
-                        FilterChip(
-                            selected = uiState.searchTv,
-                            onClick = { viewModel.toggleFilter("tv") },
-                            label = { Text("TV Shows", fontSize = 11.sp) },
-                            leadingIcon = if (uiState.searchTv) {
-                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(14.dp)) }
-                            } else null,
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                selectedLabelColor = MaterialTheme.colorScheme.primary
-                            )
-                        )
+                Spacer(modifier = Modifier.height(10.dp))
 
+                // Filter Pills
+                val filters = listOf(
+                    "all" to "All",
+                    "hls" to "HLS Streams",
+                    "direct" to "Direct Video",
+                    "local" to "Local Files",
+                    "iptv" to "IPTV / Playlist"
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(filters) { (id, label) ->
+                        val isSelected = state.selectedFilter == id
                         FilterChip(
-                            selected = uiState.searchVimeo,
-                            onClick = { viewModel.toggleFilter("vimeo") },
-                            label = { Text("Vimeo", fontSize = 11.sp) },
-                            leadingIcon = if (uiState.searchVimeo) {
-                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(14.dp)) }
-                            } else null,
+                            selected = isSelected,
+                            onClick = { viewModel.onFilterChanged(id) },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFF00ADEF).copy(alpha = 0.2f),
-                                selectedLabelColor = Color(0xFF00ADEF)
-                            )
+                                selectedContainerColor = FluxPrimary,
+                                selectedLabelColor = FluxBgDark,
+                                containerColor = FluxSurfaceVariantDark,
+                                labelColor = FluxTextSecondary
+                            ),
+                            border = null
                         )
                     }
                 }
             }
         }
 
-        // Search Loading or Results
-        if (uiState.isSearching) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
+        // Stream List or Empty State
+        if (state.filteredStreams.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = FluxCardDark),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        } else if (uiState.searchQuery.isNotBlank()) {
-            if (uiState.searchResults.isEmpty()) {
-                item {
-                    Text(
-                        text = "No results found for \"${uiState.searchQuery}\"",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-            } else {
-                item {
-                    Text(
-                        text = "Search Results (${uiState.searchResults.size})",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                items(uiState.searchResults) { item ->
-                    SearchResultCard(
-                        item = item,
-                        onClick = { viewModel.selectItem(item) }
-                    )
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.LiveTv,
+                            contentDescription = null,
+                            tint = FluxSecondary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Text(
+                            text = if (state.searchQuery.isNotBlank()) "No Matching Streams" else "No Streams Added",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = FluxTextPrimary
+                        )
+                        Text(
+                            text = if (state.searchQuery.isNotBlank()) "Try a different search query." else "Add a stream link, open a local video file, or import an M3U playlist to begin streaming.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = FluxTextSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { showAddStreamDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = FluxPrimary),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Add URL", color = FluxBgDark, fontWeight = FontWeight.Bold)
+                            }
+
+                            FilledTonalButton(
+                                onClick = { showImportM3uDialog = true },
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Import M3U")
+                            }
+                        }
+                    }
                 }
             }
         } else {
-            // Home Feed Carousels
-            if (uiState.isLoadingHome) {
-                item {
-                    Box(
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize().testTag("streams_list")
+            ) {
+                items(state.filteredStreams, key = { it.url }) { item ->
+                    Surface(
+                        color = FluxCardDark,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(40.dp),
-                        contentAlignment = Alignment.Center
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onPlayMedia(item) }
+                            .testTag("stream_card_${item.providerId}")
                     ) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            } else {
-                items(uiState.homeSections) { section ->
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = section.title,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            items(section.items) { item ->
-                                HomeHorizontalCard(
-                                    item = item,
-                                    onClick = { viewModel.selectItem(item) }
+                            // Icon container
+                            Surface(
+                                color = FluxSurfaceVariantDark,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = when {
+                                            item.url.contains(".m3u8") -> Icons.Filled.Sensors
+                                            item.provider == "local" -> Icons.Filled.VideoFile
+                                            item.provider == "playlist" -> Icons.Filled.Tv
+                                            else -> Icons.Filled.PlayCircle
+                                        },
+                                        contentDescription = null,
+                                        tint = FluxPrimary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+
+                            // Stream Title & Info
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = item.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = FluxTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = FluxPrimary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text(
+                                            text = item.type,
+                                            color = FluxPrimary,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontSize = 9.sp,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = item.url,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = FluxTextMuted,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            // Actions
+                            Row {
+                                IconButton(
+                                    onClick = { viewModel.toggleBookmark(item) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (item.isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                        contentDescription = "Bookmark",
+                                        tint = if (item.isBookmarked) FluxSecondary else FluxTextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.deleteStream(item) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Delete,
+                                        contentDescription = "Delete",
+                                        tint = FluxAccent.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -331,156 +358,138 @@ fun DiscoverScreen(
         }
     }
 
-    // Detail Bottom Sheet
-    uiState.selectedItem?.let { selected ->
-        MediaDetailSheet(
-            item = selected,
-            isLoading = uiState.isLoadingDetails,
-            isBookmarked = uiState.isSelectedBookmarked,
-            onDismiss = { viewModel.dismissDetailSheet() },
-            onPlayMedia = {
-                viewModel.dismissDetailSheet()
-                onPlayMedia(it)
+    // Add Stream Dialog
+    if (showAddStreamDialog) {
+        var inputUrl by remember { mutableStateOf("") }
+        var inputTitle by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showAddStreamDialog = false },
+            title = { Text("Add Stream URL", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = inputUrl,
+                        onValueChange = { inputUrl = it },
+                        label = { Text("Stream URL (.m3u8, .mp4, etc.)") },
+                        placeholder = { Text("https://example.com/live.m3u8") },
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { clipboard.getText()?.let { inputUrl = it.text } }) {
+                                Icon(Icons.Filled.ContentPaste, contentDescription = "Paste", tint = FluxPrimary)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().testTag("input_new_stream_url")
+                    )
+
+                    OutlinedTextField(
+                        value = inputTitle,
+                        onValueChange = { inputTitle = it },
+                        label = { Text("Stream Title (Optional)") },
+                        placeholder = { Text("e.g. Sports HD") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             },
-            onToggleBookmark = { viewModel.toggleBookmarkSelected() }
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (inputUrl.isNotBlank()) {
+                            viewModel.addStream(inputUrl, inputTitle)
+                            showAddStreamDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FluxPrimary),
+                    modifier = Modifier.testTag("btn_save_stream")
+                ) {
+                    Text("Save", color = FluxBgDark, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddStreamDialog = false }) {
+                    Text("Cancel", color = FluxTextSecondary)
+                }
+            },
+            containerColor = FluxSurfaceDark
         )
     }
-}
 
-@Composable
-private fun HomeHorizontalCard(
-    item: DiscoverItem,
-    onClick: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .width(115.dp)
-            .clickable { onClick() }
-            .testTag("discover_card_${item.id}"),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(165.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
-        ) {
-            if (item.poster.isNotBlank()) {
-                AsyncImage(
-                    model = item.poster,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize()
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Movie,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .align(Alignment.Center)
-                )
-            }
-        }
+    // Import M3U Dialog
+    if (showImportM3uDialog) {
+        var tabIndex by remember { mutableStateOf(0) }
+        var m3uUrl by remember { mutableStateOf("") }
+        var m3uContent by remember { mutableStateOf("") }
 
-        Text(
-            text = item.title,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        AlertDialog(
+            onDismissRequest = { showImportM3uDialog = false },
+            title = { Text("Import M3U Playlist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TabRow(
+                        selectedTabIndex = tabIndex,
+                        containerColor = FluxSurfaceVariantDark,
+                        contentColor = FluxTextPrimary
+                    ) {
+                        Tab(
+                            selected = tabIndex == 0,
+                            onClick = { tabIndex = 0 },
+                            text = { Text("Playlist URL") }
+                        )
+                        Tab(
+                            selected = tabIndex == 1,
+                            onClick = { tabIndex = 1 },
+                            text = { Text("Paste M3U") }
+                        )
+                    }
 
-        Text(
-            text = item.year.ifBlank { item.type },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun SearchResultCard(
-    item: DiscoverItem,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .testTag("search_result_${item.id}"),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(60.dp)
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                if (item.poster.isNotBlank()) {
-                    AsyncImage(
-                        model = item.poster,
-                        contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.matchParentSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Movie,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .align(Alignment.Center)
-                    )
+                    if (tabIndex == 0) {
+                        OutlinedTextField(
+                            value = m3uUrl,
+                            onValueChange = { m3uUrl = it },
+                            placeholder = { Text("https://example.com/playlist.m3u") },
+                            trailingIcon = {
+                                IconButton(onClick = { clipboard.getText()?.let { m3uUrl = it.text } }) {
+                                    Icon(Icons.Filled.ContentPaste, contentDescription = "Paste", tint = FluxSecondary)
+                                }
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("input_m3u_url")
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = m3uContent,
+                            onValueChange = { m3uContent = it },
+                            placeholder = { Text("#EXTM3U\n#EXTINF:-1,Channel 1\nhttp://...") },
+                            maxLines = 6,
+                            modifier = Modifier.fillMaxWidth().height(120.dp).testTag("input_m3u_text")
+                        )
+                    }
                 }
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Text(
-                    text = "${item.year.ifBlank { "N/A" }} • ${item.type}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                if (item.rating.isNotBlank()) {
-                    Text(
-                        text = "★ ${item.rating} / 10",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        fontWeight = FontWeight.Bold
-                    )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (tabIndex == 0 && m3uUrl.isNotBlank()) {
+                            viewModel.importM3uUrl(m3uUrl)
+                            showImportM3uDialog = false
+                        } else if (tabIndex == 1 && m3uContent.isNotBlank()) {
+                            viewModel.importM3uText(m3uContent)
+                            showImportM3uDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FluxSecondary),
+                    modifier = Modifier.testTag("btn_confirm_import_m3u")
+                ) {
+                    Text("Import", color = FluxBgDark, fontWeight = FontWeight.Bold)
                 }
-
-                Text(
-                    text = item.source.ifBlank { item.provider },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportM3uDialog = false }) {
+                    Text("Cancel", color = FluxTextSecondary)
+                }
+            },
+            containerColor = FluxSurfaceDark
+        )
     }
 }

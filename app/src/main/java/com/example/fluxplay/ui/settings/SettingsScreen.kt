@@ -1,589 +1,147 @@
 package com.example.fluxplay.ui.settings
 
-import android.content.Intent
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.OndemandVideo
-import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.fluxplay.R
-import com.example.fluxplay.ui.theme.parseHexColor
-import kotlinx.coroutines.launch
+import com.example.fluxplay.data.model.AppThemeMode
+import com.example.fluxplay.data.model.PlayerEngine
+import com.example.fluxplay.ui.theme.*
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     modifier: Modifier = Modifier
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val cacheSize by viewModel.cacheSizeFormatted.collectAsStateWithLifecycle()
+    val isCleaningCache by viewModel.isCleaningCache.collectAsStateWithLifecycle()
+    val cacheCleanMessage by viewModel.cacheCleanMessage.collectAsStateWithLifecycle()
+
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var showClearBookmarksDialog by remember { mutableStateOf(false) }
+    var showCleanCacheDialog by remember { mutableStateOf(false) }
 
-    var showClearDialog by remember { mutableStateOf(false) }
-    var tmdbKeyInput by remember(settings.tmdbKey) { mutableStateOf(settings.tmdbKey) }
-    var themeMenuOpen by remember { mutableStateOf(false) }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            viewModel.restoreBackup(
-                context = context,
-                uri = it,
-                onSuccess = {
-                    Toast.makeText(context, "Backup restored successfully!", Toast.LENGTH_SHORT).show()
-                },
-                onError = { errorMsg ->
-                    Toast.makeText(context, "Restore failed: $errorMsg", Toast.LENGTH_LONG).show()
-                }
-            )
-        }
-    }
-
-    if (showClearDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDialog = false },
-            title = { Text("Clear All Data") },
-            text = { Text("This will permanently delete all watch history, bookmarks, and reset your preferences. Continue?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.clearAllData {
-                            Toast.makeText(context, "Fluxplay data cleared", Toast.LENGTH_SHORT).show()
-                        }
-                        showClearDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Clear Everything")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
+    LaunchedEffect(Unit) {
+        viewModel.refreshCacheSize()
     }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        // App Logo & Brand Header Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        // Header
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF141416)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_fluxplay_logo),
-                        contentDescription = "Fluxplay Logo",
-                        tint = Color.Unspecified,
-                        modifier = Modifier.size(46.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Fluxplay",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Text(
-                        text = "High-Performance Stream & Media Player",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+            )
         }
 
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-
-        // Player Engine & Style Card
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .testTag("settings_player_engine_card"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            // Theme Section
+            Text(
+                text = "Visual Themes",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column {
-                        Text(
-                            text = "Player Engine & Interface",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Choose your playback interface style and controls",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                    AppThemeMode.values().forEach { theme ->
+                        val isSelected = settings.selectedTheme == theme
+                        val themeScheme = getThemeColorScheme(theme)
 
-                // Built-in Player Option Tile
-                val isBuiltin = settings.playerType == "builtin"
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isBuiltin) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer,
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = if (isBuiltin) 1.5.dp else 1.dp,
-                        color = if (isBuiltin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            viewModel.updatePlayerType("builtin")
-                            Toast.makeText(context, "Built-in Player active", Toast.LENGTH_SHORT).show()
-                        }
-                        .testTag("select_player_builtin")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(if (isBuiltin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayCircle,
-                                contentDescription = null,
-                                tint = if (isBuiltin) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Built-in Player",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Media3 Native",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = "Standard high-performance native Android player with clean center controls and gesture seeking.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Icon(
-                            imageVector = if (isBuiltin) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-                            contentDescription = null,
-                            tint = if (isBuiltin) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // JW Player Option Tile
-                val isJw = settings.playerType == "jwplayer"
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isJw) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer,
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = if (isJw) 1.5.dp else 1.dp,
-                        color = if (isJw) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            viewModel.updatePlayerType("jwplayer")
-                            Toast.makeText(context, "JW Player interface active", Toast.LENGTH_SHORT).show()
-                        }
-                        .testTag("select_player_jwplayer")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(if (isJw) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.OndemandVideo,
-                                contentDescription = null,
-                                tint = if (isJw) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "JW Player",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = Color(0xFFFF2B54).copy(alpha = 0.2f),
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "JW Pro",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFFFF4066),
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = "Iconic JW Player layout with bottom controller dock, HD quality pills, and signature scrub bar.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Icon(
-                            imageVector = if (isJw) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-                            contentDescription = null,
-                            tint = if (isJw) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // Vimeo Player Option Tile
-                val isVimeo = settings.playerType == "vimeo"
-                val vimeoBlue = Color(0xFF00ADEF)
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isVimeo) vimeoBlue.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer,
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = if (isVimeo) 1.5.dp else 1.dp,
-                        color = if (isVimeo) vimeoBlue else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            viewModel.updatePlayerType("vimeo")
-                            Toast.makeText(context, "Vimeo Player interface active", Toast.LENGTH_SHORT).show()
-                        }
-                        .testTag("select_player_vimeo")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(if (isVimeo) vimeoBlue else MaterialTheme.colorScheme.surface),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayCircle,
-                                contentDescription = null,
-                                tint = if (isVimeo) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Vimeo Player",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = vimeoBlue.copy(alpha = 0.2f),
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "Vimeo Pro",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = vimeoBlue,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = "Minimalist Vimeo aesthetic with signature cyan scrubber, floating center play button, and clean controls dock.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Icon(
-                            imageVector = if (isVimeo) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-                            contentDescription = null,
-                            tint = if (isVimeo) vimeoBlue else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-
-        // Appearance Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("settings_appearance_card"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(
-                    text = "Appearance",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                // Theme Mode Selector
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Theme", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "Switch between dark, light, or system theme",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Box {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            modifier = Modifier.clickable { themeMenuOpen = true }
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(10.dp),
+                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setTheme(theme) }
+                                .testTag("theme_option_${theme.id}")
                         ) {
-                            Text(
-                                text = settings.theme.replaceFirstChar { it.uppercase() },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = themeMenuOpen,
-                            onDismissRequest = { themeMenuOpen = false }
-                        ) {
-                            listOf("dark", "light", "system").forEach { mode ->
-                                DropdownMenuItem(
-                                    text = { Text(mode.replaceFirstChar { it.uppercase() }) },
-                                    onClick = {
-                                        viewModel.updateTheme(mode)
-                                        themeMenuOpen = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Primary Color Palette
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Primary Accent Color", style = MaterialTheme.typography.titleSmall)
-                    val primaryColors = listOf("#A78BFA", "#6366F1", "#3B82F6", "#10B981", "#EC4899", "#F59E0B")
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        primaryColors.forEach { hex ->
-                            val color = parseHexColor(hex, Color.Magenta)
-                            val isSelected = settings.primaryColorHex.equals(hex, ignoreCase = true)
-                            Box(
+                            Row(
                                 modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .clickable { viewModel.updatePrimaryColor(hex) }
-                                    .border(
-                                        width = if (isSelected) 3.dp else 1.dp,
-                                        color = if (isSelected) Color.White else Color.Transparent,
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (isSelected) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = theme.displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = theme.subtitle,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = FluxTextSecondary
                                     )
                                 }
-                            }
-                        }
-                    }
-                }
 
-                // Accent Color Palette
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Secondary Glow Color", style = MaterialTheme.typography.titleSmall)
-                    val accentColors = listOf("#F43F5E", "#EF4444", "#F97316", "#8B5CF6", "#06B6D4", "#10B981")
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        accentColors.forEach { hex ->
-                            val color = parseHexColor(hex, Color.Red)
-                            val isSelected = settings.accentColorHex.equals(hex, ignoreCase = true)
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .clickable { viewModel.updateAccentColor(hex) }
-                                    .border(
-                                        width = if (isSelected) 3.dp else 1.dp,
-                                        color = if (isSelected) Color.White else Color.Transparent,
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSelected) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(themeScheme.primary)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(themeScheme.secondary)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(themeScheme.background)
+                                            .border(1.dp, FluxCardBorder, CircleShape)
                                     )
                                 }
                             }
@@ -591,227 +149,465 @@ fun SettingsScreen(
                     }
                 }
             }
-        }
 
-        // Background Playback & Notifications Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("settings_background_playback_card"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Player Engine Profiles
+            Text(
+                text = "Player Engine & Profiles",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    PlayerEngine.values().forEach { engine ->
+                        val isSelected = settings.selectedEngine == engine
+
+                        Surface(
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(10.dp),
+                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setEngine(engine) }
+                                .testTag("engine_option_${engine.id}")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = engine.displayName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = engine.badge,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = engine.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = FluxTextSecondary
+                                    )
+                                }
+
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { viewModel.setEngine(engine) },
+                                    colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Playback & Background Features
+            Text(
+                text = "Background & Notifications",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Background Playback", style = MaterialTheme.typography.bodyMedium, color = FluxTextPrimary, fontWeight = FontWeight.SemiBold)
+                            Text("Keep audio/video streaming when screen is off or app minimized", style = MaterialTheme.typography.bodySmall, color = FluxTextSecondary)
+                        }
+                        Switch(
+                            checked = settings.backgroundPlayEnabled,
+                            onCheckedChange = { viewModel.setBackgroundPlay(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.background,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.testTag("switch_background_play")
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Media Notifications", style = MaterialTheme.typography.bodyMedium, color = FluxTextPrimary, fontWeight = FontWeight.SemiBold)
+                            Text("Show lockscreen & notification bar media transport controls", style = MaterialTheme.typography.bodySmall, color = FluxTextSecondary)
+                        }
+                        Switch(
+                            checked = settings.notificationsEnabled,
+                            onCheckedChange = { viewModel.setNotifications(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.background,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.testTag("switch_notifications")
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Hardware Acceleration", style = MaterialTheme.typography.bodyMedium, color = FluxTextPrimary, fontWeight = FontWeight.SemiBold)
+                            Text("Use GPU MediaCodec hardware decoding", style = MaterialTheme.typography.bodySmall, color = FluxTextSecondary)
+                        }
+                        Switch(
+                            checked = settings.hardwareAcceleration,
+                            onCheckedChange = { viewModel.setHardwareAcceleration(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.background,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.testTag("switch_hw_accel")
+                        )
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Auto Resume", style = MaterialTheme.typography.bodyMedium, color = FluxTextPrimary, fontWeight = FontWeight.SemiBold)
+                            Text("Remember playback time & restore position automatically", style = MaterialTheme.typography.bodySmall, color = FluxTextSecondary)
+                        }
+                        Switch(
+                            checked = settings.autoResume,
+                            onCheckedChange = { viewModel.setAutoResume(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.background,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary
+                            ),
+                            modifier = Modifier.testTag("switch_auto_resume")
+                        )
+                    }
+                }
+            }
+
+            // Storage & Cache Cleaner
+            Text(
+                text = "Storage & Cache Cleaner",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "Background Playback",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "Keep audio playing when minimized or when the screen is locked, with system media notification controls.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = settings.backgroundPlayback,
-                        onCheckedChange = { enabled ->
-                            viewModel.updateBackgroundPlayback(enabled)
-                            Toast.makeText(
-                                context,
-                                if (enabled) "Background playback enabled" else "Background playback disabled",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = MaterialTheme.colorScheme.primary,
-                            checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-                        ),
-                        modifier = Modifier.testTag("switch_background_playback")
-                    )
-                }
-            }
-        }
-
-        // TMDB API Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("settings_tmdb_card"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "Metadata API (TMDB)",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Text(
-                    text = "Add an optional TMDB API key to search the latest movies and official trailers directly.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                OutlinedTextField(
-                    value = tmdbKeyInput,
-                    onValueChange = {
-                        tmdbKeyInput = it
-                        viewModel.updateTmdbKey(it)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("tmdb_key_input"),
-                    placeholder = { Text("Enter TMDB API Key...", fontSize = 13.sp) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                    )
-                )
-
-                Text(
-                    text = "Open databases (TVMaze & Jikan Anime) work instantly without any API key required.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // Backup & Restore Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("settings_backup_card"),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "Backup & Restore",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Button(
-                    onClick = {
-                        scope.launch {
-                            val jsonString = viewModel.createBackupJson()
-                            val sendIntent: Intent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, jsonString)
-                                type = "application/json"
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.CleaningServices,
+                                    contentDescription = "Cache",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
-                            val shareIntent = Intent.createChooser(sendIntent, "Export Fluxplay Backup")
-                            context.startActivity(shareIntent)
+                            Column {
+                                Text(
+                                    text = "Active Media & App Cache",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = FluxTextPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "ExoPlayer stream chunks, decoded posters & HTTP cache",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = FluxTextSecondary
+                                )
+                            }
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp)
-                        .testTag("export_backup_button"),
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Upload, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Export History & Bookmarks", fontWeight = FontWeight.Bold)
-                }
 
-                OutlinedButton(
-                    onClick = { importLauncher.launch("*/*") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp)
-                        .testTag("restore_backup_button"),
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Restore Backup JSON", fontWeight = FontWeight.SemiBold)
-                }
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = cacheSize,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
 
-                OutlinedButton(
-                    onClick = { showClearDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp)
-                        .testTag("clear_data_button"),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Icon(Icons.Default.DeleteSweep, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Clear Local Data", fontWeight = FontWeight.SemiBold)
+                    if (cacheCleanMessage != null) {
+                        Surface(
+                            color = FluxEmerald.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = FluxEmerald, modifier = Modifier.size(16.dp))
+                                    Text(
+                                        text = cacheCleanMessage ?: "",
+                                        color = FluxEmerald,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.dismissCacheMessage() },
+                                    modifier = Modifier.size(20.dp)
+                                ) {
+                                    Icon(Icons.Filled.Close, contentDescription = "Dismiss", tint = FluxEmerald, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showCleanCacheDialog = true },
+                            enabled = !isCleaningCache,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier.weight(1f).testTag("btn_clean_cache")
+                        ) {
+                            if (isCleaningCache) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Cleaning...")
+                            } else {
+                                Icon(Icons.Filled.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Clean Cache", fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.refreshCacheSize() },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Refresh Cache", tint = FluxTextPrimary)
+                        }
+                    }
                 }
             }
-        }
 
-        // Privacy Policy Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Data & Storage
+            Text(
+                text = "Data Management",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Privacy & Local Data",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Fluxplay stores history, bookmarks, and preferences locally on your device using Room SQLite.\n\nYour data is never uploaded to any remote server. Metadata searches connect directly to public movie and show catalog providers.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 18.sp
-                )
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { showClearHistoryDialog = true },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("btn_clear_history")
+                    ) {
+                        Icon(Icons.Filled.History, contentDescription = null, tint = FluxAccent, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Clear Watch History", color = FluxTextPrimary)
+                    }
+
+                    OutlinedButton(
+                        onClick = { showClearBookmarksDialog = true },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("btn_clear_bookmarks")
+                    ) {
+                        Icon(Icons.Filled.BookmarkBorder, contentDescription = null, tint = FluxSecondary, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Clear Saved Bookmarks", color = FluxTextPrimary)
+                    }
+                }
+            }
+
+            // App Engine Details
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Fluxplay v2.0 • Pro Media Suite",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = FluxTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Hardware-Accelerated HLS • DASH • MKV • MP4 • Audio/Subtitles",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = FluxTextSecondary
+                    )
+                }
             }
         }
+    }
 
-        Text(
-            text = "Fluxplay • Native Edition",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(bottom = 16.dp)
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            title = { Text("Clear History?", style = MaterialTheme.typography.titleMedium) },
+            text = { Text("Are you sure you want to clear your playback history?", color = FluxTextSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearHistory()
+                    showClearHistoryDialog = false
+                    Toast.makeText(context, "History cleared", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Clear", color = FluxAccent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) {
+                    Text("Cancel", color = FluxTextSecondary)
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    if (showCleanCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showCleanCacheDialog = false },
+            title = { Text("Clean Storage Cache?", style = MaterialTheme.typography.titleMedium) },
+            text = { Text("This will purge all temporary video streaming chunks, HTTP network responses, and cached artwork to free up space. Your bookmarks, settings, and watch history will be preserved.", color = FluxTextSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCleanCacheDialog = false
+                    viewModel.cleanCache { freed ->
+                        Toast.makeText(context, "Cleaned $freed of cache storage", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Text("Clean Now", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCleanCacheDialog = false }) {
+                    Text("Cancel", color = FluxTextSecondary)
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    if (showClearBookmarksDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearBookmarksDialog = false },
+            title = { Text("Clear Bookmarks?", style = MaterialTheme.typography.titleMedium) },
+            text = { Text("Are you sure you want to clear all saved items?", color = FluxTextSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearBookmarks()
+                    showClearBookmarksDialog = false
+                    Toast.makeText(context, "Bookmarks cleared", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Clear", color = FluxAccent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearBookmarksDialog = false }) {
+                    Text("Cancel", color = FluxTextSecondary)
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 }

@@ -2,22 +2,25 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-    namespace = "com.example.fluxplay"
-    compileSdk = 35
+    namespace = "com.aistudio.fluxplay.player"
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.aistudio.fluxplay.player"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
     buildTypes {
@@ -27,7 +30,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 
@@ -44,15 +49,20 @@ android {
         compose = true
         buildConfig = true
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
-
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -61,25 +71,29 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
 
-    // Room
+    // Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // Media3 ExoPlayer
+    // Media3 & ExoPlayer
     implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.exoplayer.hls)
-    implementation(libs.androidx.media3.exoplayer.dash)
-    implementation(libs.androidx.media3.datasource)
-    implementation(libs.androidx.media3.database)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.androidx.media3.exoplayer.dash)
+    implementation(libs.androidx.media3.datasource.okhttp)
 
-    // Networking & Serialization & Images
+    // Networking, JSON, Async
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.gson)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+
+    // Image loading
     implementation(libs.coil.compose)
-    implementation(libs.okhttp)
 
     debugImplementation(libs.androidx.ui.tooling)
 }
