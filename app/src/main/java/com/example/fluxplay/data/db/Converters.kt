@@ -1,25 +1,18 @@
 package com.example.fluxplay.data.db
 
 import androidx.room.TypeConverter
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.example.fluxplay.data.model.MediaType
 
 class Converters {
-    private val gson = Gson()
+    @TypeConverter
+    fun fromMediaType(value: MediaType): String = value.name
 
     @TypeConverter
-    fun fromStringList(value: List<String>?): String {
-        return gson.toJson(value ?: emptyList<String>())
-    }
-
-    @TypeConverter
-    fun toStringList(value: String?): List<String> {
-        if (value.isNullOrEmpty()) return emptyList()
-        val listType = object : TypeToken<List<String>>() {}.type
+    fun toMediaType(value: String): MediaType {
         return try {
-            gson.fromJson(value, listType) ?: emptyList()
+            MediaType.valueOf(value)
         } catch (e: Exception) {
-            emptyList()
+            MediaType.DIRECT_URL
         }
     }
 }

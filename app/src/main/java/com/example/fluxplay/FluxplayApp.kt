@@ -5,21 +5,33 @@ import com.example.fluxplay.data.db.FluxplayDatabase
 import com.example.fluxplay.data.repository.MediaRepository
 import com.example.fluxplay.data.repository.MetadataRepository
 import com.example.fluxplay.data.repository.SettingsRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 class FluxplayApp : Application() {
 
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    lateinit var database: FluxplayDatabase
+        private set
 
-    val database by lazy { FluxplayDatabase.getDatabase(this) }
-    val mediaRepository by lazy { MediaRepository(database.mediaDao()) }
-    val settingsRepository by lazy { SettingsRepository(this) }
-    val metadataRepository by lazy { MetadataRepository() }
+    lateinit var mediaRepository: MediaRepository
+        private set
+
+    lateinit var metadataRepository: MetadataRepository
+        private set
+
+    lateinit var settingsRepository: SettingsRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
+
+        database = FluxplayDatabase.getInstance(this)
+        mediaRepository = MediaRepository(database.mediaDao())
+        metadataRepository = MetadataRepository()
+        settingsRepository = SettingsRepository(this)
+    }
+
+    companion object {
+        lateinit var instance: FluxplayApp
+            private set
     }
 }

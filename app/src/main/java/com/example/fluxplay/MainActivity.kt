@@ -1,33 +1,29 @@
 package com.example.fluxplay
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.util.UnstableApi
+import com.example.fluxplay.data.model.PlayerEngine
 import com.example.fluxplay.ui.bookmarks.BookmarksScreen
 import com.example.fluxplay.ui.discover.DiscoverScreen
 import com.example.fluxplay.ui.discover.DiscoverViewModel
@@ -37,26 +33,31 @@ import com.example.fluxplay.ui.player.PlayerScreen
 import com.example.fluxplay.ui.player.PlayerViewModel
 import com.example.fluxplay.ui.settings.SettingsScreen
 import com.example.fluxplay.ui.settings.SettingsViewModel
+import com.example.fluxplay.ui.theme.DarkBackground
+import com.example.fluxplay.ui.theme.DarkSurface
 import com.example.fluxplay.ui.theme.FluxplayTheme
+import com.example.fluxplay.ui.theme.IndigoPrimary
+import com.example.fluxplay.ui.theme.TextPrimary
+import com.example.fluxplay.ui.theme.TextSecondary
 
 enum class NavigationTab(
     val title: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
-    val tag: String
+    val testTag: String
 ) {
-    PLAYER("Player", Icons.Filled.PlayCircle, Icons.Outlined.PlayCircleOutline, "nav_tab_player"),
-    STREAMS("Streams", Icons.Filled.VideoLibrary, Icons.Outlined.VideoLibrary, "nav_tab_streams"),
-    HISTORY("History", Icons.Filled.History, Icons.Outlined.History, "nav_tab_history"),
-    BOOKMARKS("Saved", Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder, "nav_tab_bookmarks"),
-    SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings, "nav_tab_settings")
+    PLAYER("Player", Icons.Filled.PlayCircle, Icons.Outlined.PlayCircleOutline, "tab_player"),
+    STREAMS("Streams", Icons.Filled.LiveTv, Icons.Outlined.LiveTv, "tab_streams"),
+    HISTORY("History", Icons.Filled.History, Icons.Outlined.History, "tab_history"),
+    BOOKMARKS("Saved", Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder, "tab_saved"),
+    SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings, "tab_settings")
 }
 
+@OptIn(UnstableApi::class)
 class MainActivity : ComponentActivity() {
 
-    private val app by lazy { application as FluxplayApp }
-
     private val playerViewModel: PlayerViewModel by viewModels {
+        val app = application as FluxplayApp
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -66,15 +67,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private val discoverViewModel: DiscoverViewModel by viewModels {
+        val app = application as FluxplayApp
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return DiscoverViewModel(app.metadataRepository, app.mediaRepository) as T
+                return DiscoverViewModel(app.metadataRepository, app.mediaRepository, app.settingsRepository) as T
             }
         }
     }
 
     private val historyViewModel: HistoryViewModel by viewModels {
+        val app = application as FluxplayApp
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -84,38 +87,20 @@ class MainActivity : ComponentActivity() {
     }
 
     private val settingsViewModel: SettingsViewModel by viewModels {
+        val app = application as FluxplayApp
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return SettingsViewModel(app, app.settingsRepository, app.mediaRepository) as T
+                return SettingsViewModel(app.settingsRepository) as T
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
         setContent {
-            val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
-            val context = LocalContext.current
-
-            // Auto-request notification permission on Android 13+
-            val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.RequestPermission()
-            ) { /* granted -> no-op */ }
-
-            LaunchedEffect(Unit) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.POST_NOTIFICATIONS
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
-            }
-
+            val settings by settingsViewModel.settings.collectAsState()
             FluxplayTheme(themeMode = settings.selectedTheme) {
                 FluxplayMainApp(
                     playerViewModel = playerViewModel,
@@ -124,6 +109,14 @@ class MainActivity : ComponentActivity() {
                     settingsViewModel = settingsViewModel
                 )
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        val settings = (application as FluxplayApp).settingsRepository.settings.value
+        if (!settings.backgroundPlay) {
+            playerViewModel.pause()
         }
     }
 }
@@ -135,90 +128,89 @@ fun FluxplayMainApp(
     historyViewModel: HistoryViewModel,
     settingsViewModel: SettingsViewModel
 ) {
-    var selectedTab by remember { mutableStateOf(NavigationTab.PLAYER) }
-    val playerState by playerViewModel.uiState.collectAsStateWithLifecycle()
+    var currentTab by remember { mutableStateOf(NavigationTab.PLAYER) }
+    val playerState by playerViewModel.uiState.collectAsState()
 
     Scaffold(
         bottomBar = {
-            if (!playerState.isFullscreen) {
+            AnimatedVisibility(
+                visible = !playerState.isFullscreen,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
+            ) {
                 NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 8.dp
+                    containerColor = DarkSurface,
+                    contentColor = TextPrimary
                 ) {
                     NavigationTab.values().forEach { tab ->
-                        val isSelected = selectedTab == tab
+                        val selected = currentTab == tab
                         NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { selectedTab = tab },
+                            selected = selected,
+                            onClick = { currentTab = tab },
                             icon = {
                                 Icon(
-                                    imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                    contentDescription = tab.title
+                                    imageVector = if (selected) tab.selectedIcon else tab.unselectedIcon,
+                                    contentDescription = tab.title,
+                                    tint = if (selected) IndigoPrimary else TextSecondary
                                 )
                             },
-                            label = { Text(tab.title) },
+                            label = {
+                                Text(
+                                    text = tab.title,
+                                    color = if (selected) IndigoPrimary else TextSecondary
+                                )
+                            },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                indicatorColor = IndigoPrimary.copy(alpha = 0.15f)
                             ),
-                            modifier = Modifier.testTag(tab.tag)
+                            modifier = Modifier.testTag(tab.testTag)
                         )
                     }
                 }
             }
-        }
+        },
+        containerColor = DarkBackground
     ) { innerPadding ->
-        val contentModifier = if (playerState.isFullscreen) {
-            Modifier.fillMaxSize()
-        } else {
-            Modifier
+        Box(
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-        }
-
-        when (selectedTab) {
-            NavigationTab.PLAYER -> {
-                PlayerScreen(
-                    viewModel = playerViewModel,
-                    modifier = contentModifier
-                )
-            }
-            NavigationTab.STREAMS -> {
-                DiscoverScreen(
-                    viewModel = discoverViewModel,
-                    onPlayMedia = { media ->
-                        playerViewModel.loadMedia(media)
-                        selectedTab = NavigationTab.PLAYER
-                    },
-                    modifier = contentModifier
-                )
-            }
-            NavigationTab.HISTORY -> {
-                HistoryScreen(
-                    viewModel = historyViewModel,
-                    onPlayMedia = { media ->
-                        playerViewModel.loadMedia(media)
-                        selectedTab = NavigationTab.PLAYER
-                    },
-                    modifier = contentModifier
-                )
-            }
-            NavigationTab.BOOKMARKS -> {
-                BookmarksScreen(
-                    viewModel = historyViewModel,
-                    onPlayMedia = { media ->
-                        playerViewModel.loadMedia(media)
-                        selectedTab = NavigationTab.PLAYER
-                    },
-                    modifier = contentModifier
-                )
-            }
-            NavigationTab.SETTINGS -> {
-                SettingsScreen(
-                    viewModel = settingsViewModel,
-                    modifier = contentModifier
-                )
+                .padding(if (playerState.isFullscreen) androidx.compose.foundation.layout.PaddingValues() else innerPadding)
+                .background(DarkBackground)
+        ) {
+            when (currentTab) {
+                NavigationTab.PLAYER -> {
+                    PlayerScreen(viewModel = playerViewModel)
+                }
+                NavigationTab.STREAMS -> {
+                    DiscoverScreen(
+                        viewModel = discoverViewModel,
+                        onSelectMedia = { media, engine ->
+                            playerViewModel.playMedia(media, preferredEngine = engine)
+                            currentTab = NavigationTab.PLAYER
+                        }
+                    )
+                }
+                NavigationTab.HISTORY -> {
+                    HistoryScreen(
+                        viewModel = historyViewModel,
+                        onPlayMedia = { media, engine, startPos ->
+                            playerViewModel.playMedia(media, preferredEngine = engine, startPositionMs = startPos)
+                            currentTab = NavigationTab.PLAYER
+                        }
+                    )
+                }
+                NavigationTab.BOOKMARKS -> {
+                    BookmarksScreen(
+                        viewModel = historyViewModel,
+                        onPlayMedia = { media, engine ->
+                            playerViewModel.playMedia(media, preferredEngine = engine)
+                            currentTab = NavigationTab.PLAYER
+                        }
+                    )
+                }
+                NavigationTab.SETTINGS -> {
+                    SettingsScreen(viewModel = settingsViewModel)
+                }
             }
         }
     }

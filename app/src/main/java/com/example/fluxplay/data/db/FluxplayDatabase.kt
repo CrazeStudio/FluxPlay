@@ -16,13 +16,14 @@ abstract class FluxplayDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: FluxplayDatabase? = null
 
-        fun getDatabase(context: Context): FluxplayDatabase {
+        fun getInstance(context: Context): FluxplayDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     FluxplayDatabase::class.java,
-                    "fluxplay_database"
-                ).fallbackToDestructiveMigration().build()
+                    "fluxplay_database.db"
+                ).fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

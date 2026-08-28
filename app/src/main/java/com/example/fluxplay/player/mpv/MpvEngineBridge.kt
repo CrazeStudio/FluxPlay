@@ -1,56 +1,132 @@
 package com.example.fluxplay.player.mpv
 
 import android.content.Context
-import android.graphics.SurfaceTexture
-import android.view.Surface
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import android.util.Log
+import `is`.xyz.mpv.MPV
+import java.io.File
+import java.io.FileOutputStream
 
 class MpvEngineBridge(private val context: Context) {
+    private var mpvInstance: MPV? = null
+    private var isInitialized = false
 
-    private val _isInitialized = MutableStateFlow(true)
-    val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
+    fun getMpv(): MPV? = mpvInstance
 
-    private val _hwDec = MutableStateFlow("mediacodec-copy")
-    val hwDec: StateFlow<String> = _hwDec.asStateFlow()
-
-    private val _audioTracks = MutableStateFlow(listOf("Track 1 (Stereo AAC)", "Track 2 (5.1 Dolby Digital)", "Track 3 (Director Commentary)"))
-    val audioTracks: StateFlow<List<String>> = _audioTracks.asStateFlow()
-
-    private val _selectedAudioTrack = MutableStateFlow(0)
-    val selectedAudioTrack: StateFlow<Int> = _selectedAudioTrack.asStateFlow()
-
-    private val _subtitleTracks = MutableStateFlow(listOf("Off", "English (SDH)", "Spanish", "French", "Japanese"))
-    val subtitleTracks: StateFlow<List<String>> = _subtitleTracks.asStateFlow()
-
-    private val _selectedSubtitleTrack = MutableStateFlow(1)
-    val selectedSubtitleTrack: StateFlow<Int> = _selectedSubtitleTrack.asStateFlow()
-
-    private var currentSurface: Surface? = null
-
-    fun attachSurface(surfaceTexture: SurfaceTexture) {
-        currentSurface = Surface(surfaceTexture)
+    fun setMpvInstance(mpv: MPV) {
+        this.mpvInstance = mpv
     }
 
-    fun detachSurface() {
-        currentSurface?.release()
-        currentSurface = null
-    }
+    fun initializeMpv(mpv: MPV, hardwareAcceleration: Boolean = true) {
+        this.mpvInstance = mpv
+        try {
+            val configDir = File(context.filesDir, "mpv_config")
+            if (!configDir.exists()) configDir.mkdirs()
 
-    fun selectAudioTrack(index: Int) {
-        if (index in _audioTracks.value.indices) {
-            _selectedAudioTrack.value = index
+            // Prepare basic mpv.conf
+            val confFile = File(configDir, "mpv.conf")
+            if (!confFile.exists()) {
+                val defaultConf = buildString {
+                    appendLine("vo=gpu")
+                    appendLine("gpu-context=android")
+                    appendLine("opengl-es=yes")
+                    if (hardwareAcceleration) {
+                        appendLine("hwdec=auto")
+                    } else {
+                        appendLine("hwdec=no")
+                    }
+                    appendLine("cache=yes")
+                    appendLine("demuxer-max-bytes=64MiB")
+                    appendLine("demuxer-max-back-bytes=32MiB")
+                }
+                FileOutputStream(confFile).use { it.write(defaultConf.toByteArray()) }
+            }
+
+            mpv.setOptionString("vo", "gpu")
+            mpv.setOptionString("gpu-context", "android")
+            mpv.setOptionString("opengl-es", "yes")
+            if (hardwareAcceleration) {
+                mpv.setOptionString("hwdec", "auto")
+            } else {
+                mpv.setOptionString("hwdec", "no")
+            }
+            mpv.setOptionString("keep-open", "yes")
+            isInitialized = true
+        } catch (e: Exception) {
+            Log.e("MpvEngineBridge", "Failed to configure MPV options", e)
         }
     }
 
-    fun selectSubtitleTrack(index: Int) {
-        if (index in _subtitleTracks.value.indices) {
-            _selectedSubtitleTrack.value = index
+    fun loadMedia(uri: String, startPositionSec: Double = 0.0) {
+        val mpv = mpvInstance ?: return
+        try {
+            if (startPositionSec > 0) {
+                mpv.command("loadfile", uri, "replace", "start=$startPositionSec")
+            } else {
+                mpv.command("loadfile", uri, "replace")
+            }
+            mpv.setPropertyBoolean("pause", false)
+        } catch (e: Exception) {
+            Log.e("MpvEngineBridge", "Failed to load media in MPV", e)
         }
     }
 
-    fun setHwDec(enabled: Boolean) {
-        _hwDec.value = if (enabled) "mediacodec-copy" else "no (software)"
+    fun play() {
+        mpvInstance?.setPropertyBoolean("pause", false)
+    }
+
+    fun pause() {
+        mpvInstance?.setPropertyBoolean("pause", true)
+    }
+
+    fun stop() {
+        try {
+            mpvInstance?.command("stop")
+        } catch (e: Exception) {
+            Log.e("MpvEngineBridge", "Error stopping MPV", e)
+        }
+    }
+
+    fun seekTo(seconds: Double) {
+        try {
+            mpvInstance?.command("seek", seconds.toString(), "absolute")
+        } catch (e: Exception) {
+            Log.e("MpvEngineBridge", "Seek error in MPV", e)
+        }
+    }
+
+    fun setSpeed(speed: Double) {
+        try {
+            mpvInstance?.setPropertyDouble("speed", speed)
+        } catch (e: Exception) {
+            Log.e("MpvEngineBridge", "Speed set error in MPV", e)
+        }
+    }
+
+    fun setAudioTrack(trackId: Int) {
+        try {
+            mpvInstance?.setPropertyInt("aid", trackId)
+        } catch (e: Exception) {
+            Log.e("MpvEngineBridge", "Set audio track error in MPV", e)
+        }
+    }
+
+    fun setSubtitleTrack(trackId: Int) {
+        try {
+            mpvInstance?.setPropertyInt("sid", trackId)
+        } catch (e: Exception) {
+            Log.e("MpvEngineBridge", "Set subtitle track error in MPV", e)
+        }
+    }
+
+    fun getDuration(): Double {
+        return mpvInstance?.getPropertyDouble("duration") ?: 0.0
+    }
+
+    fun getTimePos(): Double {
+        return mpvInstance?.getPropertyDouble("time-pos") ?: 0.0
+    }
+
+    fun isPaused(): Boolean {
+        return mpvInstance?.getPropertyBoolean("pause") ?: true
     }
 }
