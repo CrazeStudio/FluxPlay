@@ -1,0 +1,2 @@
+sed -i 's/modifier = Modifier.fillMaxSize().testTag("fullscreen_mpv_view")/onRelease = { it.destroy() }, modifier = Modifier.fillMaxSize().testTag("fullscreen_mpv_view")/' app/src/main/java/com/example/fluxplay/ui/player/PlayerScreen.kt
+sed -i 's/modifier = Modifier.fillMaxSize().testTag("portrait_mpv_view")/onRelease = { it.destroy() }, modifier = Modifier.fillMaxSize().testTag("portrait_mpv_view")/' app/src/main/java/com/example/fluxplay/ui/player/PlayerScreen.kt

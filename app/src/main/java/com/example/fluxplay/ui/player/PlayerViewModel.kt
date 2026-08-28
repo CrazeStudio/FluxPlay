@@ -474,6 +474,16 @@ class PlayerViewModel(
         _uiState.value.currentMedia?.let { loadMedia(it) }
     }
 
+    fun pause() {
+        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
+            mpvPlayer?.setPropertyBoolean("pause", true)
+            setControlsVisibility(true)
+            return
+        }
+        exoPlayer?.pause()
+        setControlsVisibility(true)
+    }
+
     fun togglePlayPause() {
         if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
             mpvPlayer?.let { player ->
@@ -754,6 +764,8 @@ class PlayerViewModel(
         PlaybackNotificationHelper.unregisterReceiver(getApplication())
         PlaybackNotificationHelper.dismissNotification(getApplication())
         exoPlayer?.release()
+        mpvPlayer?.destroy()
+        mpvPlayer = null
         exoPlayer = null
     }
 }

@@ -109,6 +109,18 @@ fun PlayerScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, state.settings.backgroundPlayEnabled) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && !state.settings.backgroundPlayEnabled) {
+                viewModel.pause()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val context = LocalContext.current
     val activity = context.findActivity()
 
@@ -116,6 +128,48 @@ fun PlayerScreen(
     var showAudioTrackSheet by remember { mutableStateOf(false) }
     var showSubtitleSheet by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
+
+    val playerSurface = remember(state.selectedEngine) {
+        movableContentOf {
+            if (state.selectedEngine == PlayerEngine.LIBMPV) {
+                AndroidView(
+                    factory = { ctx ->
+                        com.example.fluxplay.ui.player.MPVPlayerViewWrapper(ctx).apply {
+                            layoutParams = FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            initialize(ctx.filesDir.path, ctx.cacheDir.path)
+                            viewModel.attachMpv(this.mpv)
+                        }
+                    },
+                    onRelease = { it.destroy() },
+                    modifier = Modifier.fillMaxSize().testTag("mpv_view")
+                )
+            } else {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            layoutParams = FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            useController = false
+                            setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                            resizeMode = state.resizeMode.exoMode
+                            player = viewModel.getExoPlayer()
+                        }
+                    },
+                    update = { view ->
+                        view.player = viewModel.getExoPlayer()
+                        view.resizeMode = state.resizeMode.exoMode
+                    },
+                    modifier = Modifier.fillMaxSize().testTag("player_view")
+                )
+            }
+        }
+    }
+
     var showSpeedSheet by remember { mutableStateOf(false) }
     var showEngineSheet by remember { mutableStateOf(false) }
 
@@ -181,41 +235,7 @@ fun PlayerScreen(
                 .background(Color.Black)
         ) {
             // Android Player View
-            if (state.selectedEngine == PlayerEngine.LIBMPV) {
-                AndroidView(
-                    factory = { ctx ->
-                        com.example.fluxplay.ui.player.MPVPlayerViewWrapper(ctx).apply {
-                            layoutParams = FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            initialize(ctx.filesDir.path, ctx.cacheDir.path)
-                            viewModel.attachMpv(this.mpv)
-                        }
-                    },
-                    modifier = Modifier.fillMaxSize().testTag("fullscreen_mpv_view")
-                )
-            } else {
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            layoutParams = FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            useController = false
-                            setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                            resizeMode = state.resizeMode.exoMode
-                            player = viewModel.getExoPlayer()
-                        }
-                    },
-                    update = { view ->
-                        view.player = viewModel.getExoPlayer()
-                        view.resizeMode = state.resizeMode.exoMode
-                    },
-                    modifier = Modifier.fillMaxSize().testTag("fullscreen_player_view")
-                )
-            }
+            playerSurface()
 
             // Touch & Gesture Interaction Surface
             Box(
@@ -566,41 +586,7 @@ fun PlayerScreen(
                     .background(Color.Black)
             ) {
                 // Player View
-                if (state.selectedEngine == PlayerEngine.LIBMPV) {
-                    AndroidView(
-                        factory = { ctx ->
-                            com.example.fluxplay.ui.player.MPVPlayerViewWrapper(ctx).apply {
-                                layoutParams = FrameLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-                                initialize(ctx.filesDir.path, ctx.cacheDir.path)
-                                viewModel.attachMpv(this.mpv)
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize().testTag("portrait_mpv_view")
-                    )
-                } else {
-                    AndroidView(
-                        factory = { ctx ->
-                            PlayerView(ctx).apply {
-                                layoutParams = FrameLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-                                useController = false
-                                setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                                resizeMode = state.resizeMode.exoMode
-                                player = viewModel.getExoPlayer()
-                            }
-                        },
-                        update = { view ->
-                            view.player = viewModel.getExoPlayer()
-                            view.resizeMode = state.resizeMode.exoMode
-                        },
-                        modifier = Modifier.fillMaxSize().testTag("portrait_player_view")
-                    )
-                }
+                playerSurface()
 
                 // Tap & Gesture Detector Overlay (100% Clickable & Responsive)
                 Box(
