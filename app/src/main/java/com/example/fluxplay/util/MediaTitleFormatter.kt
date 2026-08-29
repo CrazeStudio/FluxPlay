@@ -149,10 +149,16 @@ object MediaTitleFormatter {
     }
 
     fun decodeIfUrlEncoded(text: String): String {
-        return try {
-            URLDecoder.decode(text, "UTF-8")
-        } catch (_: Exception) {
-            text
-        }
+        var current = text
+        try {
+            var iterations = 0
+            while (current.contains("%") && iterations < 3) {
+                val decoded = URLDecoder.decode(current, "UTF-8")
+                if (decoded == current) break
+                current = decoded
+                iterations++
+            }
+        } catch (_: Exception) {}
+        return current.trim()
     }
 }
