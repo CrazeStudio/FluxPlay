@@ -11,7 +11,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.aistudio.fluxplay.player"
+        applicationId = "com.crazdstudio.fluxplay"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
