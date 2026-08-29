@@ -3,110 +3,151 @@ package com.example.fluxplay.ui.discover
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fluxplay.data.model.MediaItemEntity
-import com.example.fluxplay.data.model.MediaType
 import com.example.fluxplay.data.repository.MediaRepository
-import com.example.fluxplay.data.repository.MetadataRepository
-import com.example.fluxplay.data.repository.SettingsRepository
+import com.example.fluxplay.util.MediaTitleFormatter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.UUID
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 data class DiscoverUiState(
-    val streamList: List<MediaItemEntity> = emptyList(),
-    val categories: List<String> = listOf("All"),
-    val selectedCategory: String = "All",
+    val allStreams: List<MediaItemEntity> = emptyList(),
+    val filteredStreams: List<MediaItemEntity> = emptyList(),
     val searchQuery: String = "",
+    val selectedFilter: String = "all", // "all", "hls", "direct", "local", "iptv"
     val isLoading: Boolean = false,
-    val customUrlInput: String = "",
-    val errorMessage: String? = null
+    val importMessage: String? = null
 )
 
 class DiscoverViewModel(
-    private val metadataRepository: MetadataRepository,
-    private val mediaRepository: MediaRepository,
-    private val settingsRepository: SettingsRepository
+    private val mediaRepository: MediaRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DiscoverUiState())
     val uiState: StateFlow<DiscoverUiState> = _uiState.asStateFlow()
 
+    private val httpClient = OkHttpClient.Builder().build()
+
     init {
-        loadInitialStreams()
+        observeStreams()
     }
 
-    private fun loadInitialStreams() {
-        val samples = metadataRepository.defaultSampleStreams
-        val cats = listOf("All") + samples.mapNotNull { it.groupTitle }.distinct()
-        _uiState.update {
-            it.copy(
-                streamList = samples,
-                categories = cats
-            )
-        }
-    }
-
-    fun selectCategory(category: String) {
-        _uiState.update { it.copy(selectedCategory = category) }
-    }
-
-    fun onSearchQueryChanged(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
-    }
-
-    fun onCustomUrlChanged(url: String) {
-        _uiState.update { it.copy(customUrlInput = url) }
-    }
-
-    fun importM3uPlaylist(url: String) {
-        if (url.isBlank()) return
+    private fun observeStreams() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val parsed = metadataRepository.parseM3uPlaylist(url)
-            if (parsed.isNotEmpty()) {
-                val combined = (_uiState.value.streamList + parsed).distinctBy { it.uri }
-                val cats = listOf("All") + combined.mapNotNull { it.groupTitle }.distinct()
-                _uiState.update {
-                    it.copy(
-                        streamList = combined,
-                        categories = cats,
-                        isLoading = false,
-                        customUrlInput = ""
-                    )
-                }
-            } else {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = "Could not parse playlist. Please verify the URL."
-                    )
-                }
+            mediaRepository.getAllStreams().collect { streams ->
+                _uiState.value = _uiState.value.copy(allStreams = streams)
+                applyFilterAndSearch()
             }
         }
     }
 
-    fun playDirectUrl(url: String, onPlay: (MediaItemEntity) -> Unit) {
-        if (url.isBlank()) return
-        val mediaType = when {
-            url.endsWith(".m3u8", ignoreCase = true) -> MediaType.HLS_STREAM
-            url.endsWith(".mpd", ignoreCase = true) -> MediaType.DASH_STREAM
-            else -> MediaType.DIRECT_URL
-        }
-        val media = MediaItemEntity(
-            id = UUID.randomUUID().toString(),
-            title = "Custom Stream (${url.takeLast(25)})",
-            uri = url,
-            mediaType = mediaType,
-            groupTitle = "Direct Stream"
-        )
-        onPlay(media)
+    fun onSearchQueryChanged(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        applyFilterAndSearch()
     }
 
-    fun toggleBookmark(media: MediaItemEntity) {
-        viewModelScope.launch {
-            mediaRepository.toggleBookmark(media)
+    fun onFilterChanged(filter: String) {
+        _uiState.value = _uiState.value.copy(selectedFilter = filter)
+        applyFilterAndSearch()
+    }
+
+    private fun applyFilterAndSearch() {
+        val query = _uiState.value.searchQuery.trim().lowercase()
+        val filter = _uiState.value.selectedFilter
+
+        val filtered = _uiState.value.allStreams.filter { item ->
+            val matchesQuery = query.isBlank() ||
+                item.title.lowercase().contains(query) ||
+                item.url.lowercase().contains(query) ||
+                item.type.lowercase().contains(query)
+
+            val matchesFilter = when (filter) {
+                "hls" -> item.url.contains(".m3u8", ignoreCase = true) || item.type.contains("HLS", ignoreCase = true)
+                "direct" -> item.type.contains("Direct", ignoreCase = true) || item.url.endsWith(".mp4", ignoreCase = true) || item.url.endsWith(".mkv", ignoreCase = true)
+                "local" -> item.provider == "local" || item.url.startsWith("content://") || item.url.startsWith("file://")
+                "iptv" -> item.provider == "playlist" || item.source == "Playlist"
+                else -> true
+            }
+
+            matchesQuery && matchesFilter
         }
+        _uiState.value = _uiState.value.copy(filteredStreams = filtered)
+    }
+
+    fun addStream(url: String, title: String) {
+        if (url.isBlank()) return
+        val trimmed = url.trim()
+        val streamTitle = MediaTitleFormatter.extractCleanTitle(title, trimmed)
+        val item = MediaItemEntity(
+            url = trimmed,
+            title = streamTitle,
+            poster = "",
+            year = "Stream",
+            type = if (trimmed.contains(".m3u8")) "HLS Stream" else if (trimmed.contains(".mpd")) "DASH Stream" else "Direct Video",
+            rating = "HD",
+            source = "Saved Stream",
+            provider = "custom",
+            providerId = "custom_${System.currentTimeMillis()}",
+            synopsis = "Saved stream: $streamTitle"
+        )
+        viewModelScope.launch {
+            mediaRepository.saveOrUpdateMedia(item)
+        }
+    }
+
+    fun importM3uUrl(m3uUrl: String) {
+        if (m3uUrl.isBlank()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, importMessage = null)
+            try {
+                val count = withContext(Dispatchers.IO) {
+                    val request = Request.Builder().url(m3uUrl.trim()).build()
+                    val response = httpClient.newCall(request).execute()
+                    val body = response.body?.string() ?: ""
+                    mediaRepository.importM3uPlaylist(body)
+                }
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    importMessage = "Successfully imported $count streams!"
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    importMessage = "Import failed: ${e.localizedMessage ?: "Invalid URL"}"
+                )
+            }
+        }
+    }
+
+    fun importM3uText(content: String) {
+        if (content.isBlank()) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, importMessage = null)
+            val count = mediaRepository.importM3uPlaylist(content)
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                importMessage = "Successfully imported $count streams!"
+            )
+        }
+    }
+
+    fun deleteStream(item: MediaItemEntity) {
+        viewModelScope.launch {
+            mediaRepository.deleteMedia(item.url)
+        }
+    }
+
+    fun toggleBookmark(item: MediaItemEntity) {
+        viewModelScope.launch {
+            mediaRepository.toggleBookmark(item)
+        }
+    }
+
+    fun clearImportMessage() {
+        _uiState.value = _uiState.value.copy(importMessage = null)
     }
 }

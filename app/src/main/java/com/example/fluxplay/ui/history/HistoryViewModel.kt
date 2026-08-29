@@ -9,19 +9,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class HistoryViewModel(private val mediaRepository: MediaRepository) : ViewModel() {
+class HistoryViewModel(
+    private val mediaRepository: MediaRepository
+) : ViewModel() {
 
-    val historyItems: StateFlow<List<MediaItemEntity>> = mediaRepository.history
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val historyItems: StateFlow<List<MediaItemEntity>> = mediaRepository.getWatchHistory()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
-    val bookmarkItems: StateFlow<List<MediaItemEntity>> = mediaRepository.bookmarks
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    fun deleteItem(media: MediaItemEntity) {
-        viewModelScope.launch {
-            mediaRepository.deleteMedia(media)
-        }
-    }
+    val bookmarkedItems: StateFlow<List<MediaItemEntity>> = mediaRepository.getBookmarks()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     fun clearHistory() {
         viewModelScope.launch {
@@ -35,9 +39,15 @@ class HistoryViewModel(private val mediaRepository: MediaRepository) : ViewModel
         }
     }
 
-    fun toggleBookmark(media: MediaItemEntity) {
+    fun toggleBookmark(item: MediaItemEntity) {
         viewModelScope.launch {
-            mediaRepository.toggleBookmark(media)
+            mediaRepository.toggleBookmark(item)
+        }
+    }
+
+    fun deleteItem(url: String) {
+        viewModelScope.launch {
+            mediaRepository.deleteMedia(url)
         }
     }
 }

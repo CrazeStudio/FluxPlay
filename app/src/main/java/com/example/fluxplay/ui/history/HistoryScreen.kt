@@ -7,12 +7,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,216 +24,177 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.fluxplay.data.model.MediaItemEntity
-import com.example.fluxplay.data.model.PlayerEngine
 import com.example.fluxplay.ui.theme.*
-import java.text.SimpleDateFormat
-import java.util.*
+import com.example.fluxplay.util.MediaTitleFormatter
 
 @Composable
 fun HistoryScreen(
     viewModel: HistoryViewModel,
-    onPlayMedia: (MediaItemEntity, PlayerEngine, Long) -> Unit,
-    modifier: Modifier = Modifier
+    onPlayMedia: (MediaItemEntity) -> Unit,
+    modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null
 ) {
-    val historyList by viewModel.historyItems.collectAsState()
-    var showClearConfirm by remember { mutableStateOf(false) }
+    val historyItems by viewModel.historyItems.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(DarkSurface)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Playback History",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-
-                if (historyList.isNotEmpty()) {
-                    IconButton(
-                        onClick = { showClearConfirm = true },
-                        modifier = Modifier.testTag("clear_history_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Clear History",
-                            tint = ErrorRed
-                        )
-                    }
-                }
-            }
-        },
-        containerColor = DarkBackground,
+    Column(
         modifier = modifier
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            if (historyList.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.History,
-                        contentDescription = null,
-                        tint = TextSecondary,
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "No watch history yet",
-                        color = TextPrimary,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Videos and streams you play will appear here with your resume position",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(historyList, key = { it.id }) { item ->
-                        HistoryCard(
-                            media = item,
-                            onClick = { onPlayMedia(item, PlayerEngine.EXOPLAYER, item.lastPositionMs) },
-                            onDelete = { viewModel.deleteItem(item) }
-                        )
-                    }
-                }
-            }
-        }
-
-        if (showClearConfirm) {
-            AlertDialog(
-                onDismissRequest = { showClearConfirm = false },
-                title = { Text("Clear Watch History", color = TextPrimary) },
-                text = { Text("Are you sure you want to clear your entire playback history?", color = TextSecondary) },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.clearHistory()
-                            showClearConfirm = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
-                    ) {
-                        Text("Clear All")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showClearConfirm = false }) {
-                        Text("Cancel", color = TextSecondary)
-                    }
-                },
-                containerColor = DarkSurface
-            )
-        }
-    }
-}
-
-@Composable
-fun HistoryCard(
-    media: MediaItemEntity,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val dateFormat = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
-    val dateStr = remember(media.lastPlayedTimestamp) { dateFormat.format(Date(media.lastPlayedTimestamp)) }
-
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = DarkSurface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
+        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = if (onBack != null) 8.dp else 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (media.thumbnailUri != null) {
-                AsyncImage(
-                    model = media.thumbnailUri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = DarkSurfaceVariant,
-                    modifier = Modifier.size(60.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = IndigoPrimary,
-                            modifier = Modifier.size(32.dp)
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = media.title,
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Resumed: ${formatDuration(media.lastPositionMs)} • $dateStr",
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontSize = 12.sp
+                    text = "Watch History",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold
                 )
             }
+            if (historyItems.isNotEmpty()) {
+                TextButton(onClick = { viewModel.clearHistory() }) {
+                    Text("Clear All", color = FluxAccent)
+                }
+            }
+        }
 
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = TextSecondary.copy(alpha = 0.7f)
-                )
+        if (historyItems.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "No watch history yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = FluxTextSecondary
+                    )
+                    Text(
+                        text = "Streams and videos you watch will show up here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FluxTextMuted
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(historyItems, key = { it.url }) { item ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPlayMedia(item) }
+                            .testTag("history_item_${item.providerId}"),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = FluxCardDark)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (item.poster.isNotBlank()) {
+                                AsyncImage(
+                                    model = item.poster,
+                                    contentDescription = item.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .width(70.dp)
+                                        .height(50.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                )
+                            } else {
+                                Surface(
+                                    color = FluxSurfaceVariantDark,
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier
+                                        .width(70.dp)
+                                        .height(50.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = if (item.url.contains(".m3u8")) Icons.Filled.Sensors else if (item.provider == "local") Icons.Filled.VideoFile else Icons.Filled.PlayCircle,
+                                            contentDescription = null,
+                                            tint = FluxPrimary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val cleanTitle = MediaTitleFormatter.extractCleanTitle(item.title, item.url)
+                                Text(
+                                    text = cleanTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = FluxTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = item.type,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = FluxTextSecondary,
+                                    fontSize = 10.sp
+                                )
+                                if (item.durationSeconds > 0) {
+                                    val progressRatio = (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                    LinearProgressIndicator(
+                                        progress = { progressRatio },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = FluxPrimary,
+                                        trackColor = FluxCardBorder
+                                    )
+                                }
+                            }
+
+                            IconButton(onClick = { viewModel.deleteItem(item.url) }) {
+                                Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete", tint = FluxTextMuted, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-}
-
-private fun formatDuration(timeMs: Long): String {
-    if (timeMs <= 0L) return "00:00"
-    val seconds = timeMs / 1000
-    val m = seconds / 60
-    val s = seconds % 60
-    return String.format("%02d:%02d", m, s)
 }

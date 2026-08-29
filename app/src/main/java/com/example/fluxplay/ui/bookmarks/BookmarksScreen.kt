@@ -7,200 +7,172 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkRemove
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.fluxplay.data.model.MediaItemEntity
-import com.example.fluxplay.data.model.PlayerEngine
 import com.example.fluxplay.ui.history.HistoryViewModel
 import com.example.fluxplay.ui.theme.*
+import com.example.fluxplay.util.MediaTitleFormatter
 
 @Composable
 fun BookmarksScreen(
     viewModel: HistoryViewModel,
-    onPlayMedia: (MediaItemEntity, PlayerEngine) -> Unit,
+    onPlayMedia: (MediaItemEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bookmarkList by viewModel.bookmarkItems.collectAsState()
-    var showClearConfirm by remember { mutableStateOf(false) }
+    val bookmarks by viewModel.bookmarkedItems.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(DarkSurface)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Saved Streams",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-
-                if (bookmarkList.isNotEmpty()) {
-                    IconButton(onClick = { showClearConfirm = true }) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Clear Bookmarks",
-                            tint = TextSecondary
-                        )
-                    }
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Saved Streams",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Bold
+            )
+            if (bookmarks.isNotEmpty()) {
+                TextButton(onClick = { viewModel.clearBookmarks() }) {
+                    Text("Clear All", color = FluxAccent)
                 }
             }
-        },
-        containerColor = DarkBackground,
-        modifier = modifier
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            if (bookmarkList.isEmpty()) {
+        }
+
+        if (bookmarks.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Bookmark,
-                        contentDescription = null,
-                        tint = TextSecondary,
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "No saved bookmarks yet",
-                        color = TextPrimary,
+                        text = "No saved streams yet",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        color = FluxTextSecondary
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Bookmark favorite streams and channels for instant 1-tap access",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Tap the bookmark icon on any stream to save it here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FluxTextMuted
                     )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(bookmarkList, key = { it.id }) { item ->
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = DarkSurface,
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(bookmarks, key = { it.url }) { item ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPlayMedia(item) }
+                            .testTag("bookmark_item_${item.providerId}"),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = FluxCardDark)
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onPlayMedia(item, PlayerEngine.EXOPLAYER) }
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (item.thumbnailUri != null) {
-                                    AsyncImage(
-                                        model = item.thumbnailUri,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(56.dp)
-                                            .clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                } else {
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = DarkSurfaceVariant,
-                                        modifier = Modifier.size(56.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.PlayArrow,
-                                                contentDescription = null,
-                                                tint = IndigoPrimary,
-                                                modifier = Modifier.size(32.dp)
-                                            )
-                                        }
+                            if (item.poster.isNotBlank()) {
+                                AsyncImage(
+                                    model = item.poster,
+                                    contentDescription = item.title,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .width(70.dp)
+                                        .height(50.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                )
+                            } else {
+                                Surface(
+                                    color = FluxSurfaceVariantDark,
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier
+                                        .width(70.dp)
+                                        .height(50.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = if (item.url.contains(".m3u8")) Icons.Filled.Sensors else if (item.provider == "local") Icons.Filled.VideoFile else Icons.Filled.PlayCircle,
+                                            contentDescription = null,
+                                            tint = FluxSecondary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
                                     }
                                 }
+                            }
 
-                                Spacer(modifier = Modifier.width(12.dp))
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val cleanTitle = MediaTitleFormatter.extractCleanTitle(item.title, item.url)
+                                Text(
+                                    text = cleanTitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = FluxTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = item.type,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = FluxTextSecondary,
+                                    fontSize = 10.sp
+                                )
+                            }
 
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = item.title,
-                                        color = TextPrimary,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = item.groupTitle ?: "Saved Stream",
-                                        color = TextSecondary,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-
-                                IconButton(onClick = { viewModel.toggleBookmark(item) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.BookmarkRemove,
-                                        contentDescription = "Remove Bookmark",
-                                        tint = CyanAccent
-                                    )
-                                }
+                            IconButton(onClick = { viewModel.toggleBookmark(item) }) {
+                                Icon(
+                                    Icons.Filled.BookmarkRemove,
+                                    contentDescription = "Remove bookmark",
+                                    tint = FluxAccent,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     }
                 }
             }
-        }
-
-        if (showClearConfirm) {
-            AlertDialog(
-                onDismissRequest = { showClearConfirm = false },
-                title = { Text("Clear All Bookmarks", color = TextPrimary) },
-                text = { Text("Are you sure you want to remove all saved bookmarks?", color = TextSecondary) },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.clearBookmarks()
-                            showClearConfirm = false
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
-                    ) {
-                        Text("Clear All")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showClearConfirm = false }) {
-                        Text("Cancel", color = TextSecondary)
-                    }
-                },
-                containerColor = DarkSurface
-            )
         }
     }
 }

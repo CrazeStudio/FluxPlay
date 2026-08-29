@@ -1,15 +1,8 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:pathData="M38,30 L76,54 L38,78 Z"
-        android:fillColor="#6366F1" />
-    <path
-        android:pathData="M32,24 C32,24 48,16 68,26 C88,36 84,64 74,78 C64,92 42,92 32,84"
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="4"
-        android:strokeLineCap="round" />
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="66dp"
+        android:height="66dp"
+        android:drawable="@drawable/ic_fluxplay_logo"
+        android:gravity="center" />
+</layer-list>
