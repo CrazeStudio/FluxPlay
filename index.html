@@ -1,0 +1,2507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#030305">
+
+<title>FluxPlay — Private Project</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    background:#030305;
+    color:#fff;
+    font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    overflow-x:hidden;
+}
+
+body.booting{
+    overflow:hidden;
+}
+
+a{
+    color:inherit;
+    text-decoration:none;
+}
+
+button{
+    font:inherit;
+}
+
+/* =========================================================
+   GLOBAL CURSOR LIGHT
+========================================================= */
+
+.cursor-glow{
+    position:fixed;
+    width:320px;
+    height:320px;
+    border-radius:50%;
+    pointer-events:none;
+    z-index:9998;
+    background:radial-gradient(
+        circle,
+        rgba(105,80,255,.09),
+        transparent 68%
+    );
+    transform:translate(-50%,-50%);
+    mix-blend-mode:screen;
+}
+
+/* =========================================================
+   CINEMATIC BOOT
+========================================================= */
+
+.boot{
+    position:fixed;
+    inset:0;
+    z-index:10000;
+    background:#020204;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+    transition:
+        opacity 1.2s cubic-bezier(.2,.8,.2,1),
+        visibility 1.2s;
+}
+
+.boot.finished{
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+}
+
+.boot-grid{
+    position:absolute;
+    inset:-40%;
+    background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:60px 60px;
+    transform:
+        perspective(500px)
+        rotateX(65deg)
+        translateY(160px);
+    mask-image:radial-gradient(circle,#000,transparent 65%);
+    animation:bootGrid 9s linear infinite;
+}
+
+.boot-vignette{
+    position:absolute;
+    inset:0;
+    background:
+        radial-gradient(
+            circle at center,
+            transparent 0,
+            rgba(0,0,0,.72) 70%,
+            #000 100%
+        );
+}
+
+.boot-glow{
+    position:absolute;
+    width:600px;
+    height:600px;
+    border-radius:50%;
+    background:
+        radial-gradient(
+            circle,
+            rgba(113,76,255,.22),
+            transparent 68%
+        );
+    filter:blur(25px);
+    animation:bootGlow 3s ease-in-out infinite;
+}
+
+.energy-ring{
+    position:absolute;
+    width:280px;
+    height:280px;
+    border:1px solid rgba(140,115,255,.15);
+    border-radius:50%;
+    animation:ringExpand 2.2s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.energy-ring.r2{
+    width:430px;
+    height:430px;
+    border-color:rgba(65,210,255,.07);
+    animation-delay:.12s;
+}
+
+.energy-ring.r3{
+    width:620px;
+    height:620px;
+    border-color:rgba(255,255,255,.035);
+    animation-delay:.25s;
+}
+
+.energy-ring::before,
+.energy-ring::after{
+    content:"";
+    position:absolute;
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background:#8b6dff;
+    box-shadow:0 0 25px #8b6dff;
+}
+
+.energy-ring::before{
+    top:-3px;
+    left:50%;
+}
+
+.energy-ring::after{
+    bottom:10%;
+    right:3%;
+    background:#4ce1ff;
+    box-shadow:0 0 25px #4ce1ff;
+}
+
+.boot-core{
+    position:relative;
+    z-index:5;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    animation:coreIn 1.1s cubic-bezier(.2,.8,.2,1) .2s both;
+}
+
+.flux-logo{
+    width:105px;
+    height:105px;
+    border-radius:31px;
+    background:
+        linear-gradient(
+            135deg,
+            #8060ff 0%,
+            #604cff 45%,
+            #32ddff 100%
+        );
+    display:grid;
+    place-items:center;
+    position:relative;
+    overflow:hidden;
+    box-shadow:
+        0 0 35px rgba(120,85,255,.45),
+        0 0 120px rgba(45,210,255,.14);
+    animation:logoFloat 3s ease-in-out infinite;
+}
+
+.flux-logo::before{
+    content:"";
+    position:absolute;
+    width:180%;
+    height:38%;
+    background:linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.55),
+        transparent
+    );
+    transform:rotate(-45deg) translateX(-120%);
+    animation:logoSweep 1.2s cubic-bezier(.2,.8,.2,1) 1s forwards;
+}
+
+.flux-logo::after{
+    content:"";
+    width:0;
+    height:0;
+    border-top:16px solid transparent;
+    border-bottom:16px solid transparent;
+    border-left:23px solid #fff;
+    margin-left:6px;
+    position:relative;
+    z-index:3;
+}
+
+.boot-name{
+    margin-top:25px;
+    font-size:44px;
+    line-height:1;
+    font-weight:950;
+    letter-spacing:-3px;
+}
+
+.boot-caption{
+    margin-top:9px;
+    color:#676771;
+    text-transform:uppercase;
+    letter-spacing:4px;
+    font-size:9px;
+}
+
+.boot-status{
+    position:absolute;
+    bottom:42px;
+    color:#52525a;
+    font-family:monospace;
+    font-size:9px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+}
+
+.boot-status::after{
+    content:"";
+    animation:statusText 2.5s steps(1) infinite;
+}
+
+.boot-progress{
+    position:absolute;
+    bottom:27px;
+    width:160px;
+    height:1px;
+    background:#17171c;
+    overflow:hidden;
+}
+
+.boot-progress span{
+    display:block;
+    width:100%;
+    height:100%;
+    transform:translateX(-100%);
+    background:linear-gradient(90deg,#7860ff,#4ce1ff);
+    animation:bootProgress 2.8s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+/* =========================================================
+   PARTICLES
+========================================================= */
+
+.particles{
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+    pointer-events:none;
+}
+
+.particle{
+    position:absolute;
+    width:2px;
+    height:2px;
+    border-radius:50%;
+    background:#fff;
+    opacity:0;
+    animation:particleFly var(--duration) linear infinite;
+    animation-delay:var(--delay);
+}
+
+/* =========================================================
+   NAV
+========================================================= */
+
+nav{
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    height:72px;
+    z-index:1000;
+    background:rgba(3,3,5,.55);
+    backdrop-filter:blur(20px);
+    border-bottom:1px solid rgba(255,255,255,.055);
+}
+
+.nav{
+    width:min(1180px,92%);
+    height:100%;
+    margin:auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+}
+
+.brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-weight:850;
+    font-size:18px;
+}
+
+.brand-icon{
+    width:31px;
+    height:31px;
+    border-radius:10px;
+    background:linear-gradient(135deg,#8060ff,#35dcff);
+    display:grid;
+    place-items:center;
+}
+
+.brand-icon::after{
+    content:"";
+    width:0;
+    height:0;
+    border-top:6px solid transparent;
+    border-bottom:6px solid transparent;
+    border-left:9px solid #fff;
+    margin-left:3px;
+}
+
+.nav-links{
+    display:flex;
+    gap:28px;
+    color:#85858e;
+    font-size:13px;
+}
+
+.nav-links a{
+    transition:.25s;
+}
+
+.nav-links a:hover{
+    color:#fff;
+}
+
+.nav-download{
+    padding:10px 17px;
+    border-radius:100px;
+    background:#fff;
+    color:#050507;
+    font-size:12px;
+    font-weight:800;
+    transition:.25s;
+}
+
+.nav-download:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 35px rgba(255,255,255,.15);
+}
+
+/* =========================================================
+   GENERAL
+========================================================= */
+
+.container{
+    width:min(1180px,92%);
+    margin:auto;
+}
+
+section{
+    padding:145px 0;
+}
+
+.label{
+    color:#8876e9;
+    text-transform:uppercase;
+    letter-spacing:3px;
+    font-size:10px;
+    margin-bottom:18px;
+}
+
+.title{
+    font-size:clamp(43px,6.5vw,80px);
+    line-height:.92;
+    letter-spacing:-5px;
+    max-width:900px;
+}
+
+.description{
+    max-width:650px;
+    color:#8e8e98;
+    margin-top:24px;
+    line-height:1.8;
+    font-size:16px;
+}
+
+/* =========================================================
+   HERO
+========================================================= */
+
+.hero{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+}
+
+.hero-grid{
+    position:absolute;
+    inset:-20%;
+    background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:70px 70px;
+    transform:
+        perspective(600px)
+        rotateX(58deg)
+        translateY(140px);
+    mask-image:radial-gradient(circle at center,#000,transparent 68%);
+    animation:heroGrid 14s linear infinite;
+}
+
+.hero-light{
+    position:absolute;
+    width:750px;
+    height:750px;
+    border-radius:50%;
+    background:
+        radial-gradient(
+            circle,
+            rgba(115,80,255,.18),
+            transparent 67%
+        );
+    filter:blur(30px);
+    animation:heroLight 8s ease-in-out infinite;
+}
+
+.hero-orbit{
+    position:absolute;
+    width:570px;
+    height:570px;
+    border:1px solid rgba(130,105,255,.075);
+    border-radius:50%;
+    animation:spin 24s linear infinite;
+}
+
+.hero-orbit::before,
+.hero-orbit::after{
+    content:"";
+    position:absolute;
+    width:7px;
+    height:7px;
+    border-radius:50%;
+}
+
+.hero-orbit::before{
+    top:12%;
+    left:13%;
+    background:#8b70ff;
+    box-shadow:0 0 30px #8b70ff;
+}
+
+.hero-orbit::after{
+    bottom:13%;
+    right:10%;
+    background:#52dcff;
+    box-shadow:0 0 30px #52dcff;
+}
+
+.hero-content{
+    position:relative;
+    z-index:4;
+}
+
+.hero-badge{
+    display:inline-flex;
+    padding:8px 14px;
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:100px;
+    background:rgba(255,255,255,.025);
+    color:#8f8f98;
+    font-size:10px;
+    letter-spacing:.5px;
+    animation:heroUp 1s .1s both;
+}
+
+.hero h1{
+    margin-top:30px;
+    font-size:clamp(72px,13vw,150px);
+    line-height:.77;
+    letter-spacing:-11px;
+    font-weight:950;
+    animation:heroUp 1s .2s both;
+}
+
+.gradient{
+    background:
+        linear-gradient(
+            110deg,
+            #fff 10%,
+            #b0a2ff 45%,
+            #63e6ff 85%
+        );
+    background-size:200%;
+    background-clip:text;
+    -webkit-background-clip:text;
+    color:transparent;
+    animation:gradientShift 5s ease infinite;
+}
+
+.hero-text{
+    max-width:670px;
+    margin:38px auto;
+    color:#91919b;
+    font-size:17px;
+    line-height:1.7;
+    animation:heroUp 1s .3s both;
+}
+
+.hero-buttons{
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:12px;
+    animation:heroUp 1s .4s both;
+}
+
+.button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:15px 23px;
+    border-radius:100px;
+    font-size:13px;
+    font-weight:800;
+    transition:.3s cubic-bezier(.2,.8,.2,1);
+}
+
+.button.primary{
+    color:#050507;
+    background:#fff;
+}
+
+.button.secondary{
+    color:#dddde2;
+    border:1px solid rgba(255,255,255,.1);
+    background:rgba(255,255,255,.035);
+}
+
+.button:hover{
+    transform:translateY(-4px) scale(1.02);
+}
+
+.scroll-hint{
+    position:absolute;
+    bottom:27px;
+    left:50%;
+    transform:translateX(-50%);
+    color:#53535c;
+    font-size:9px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    animation:breathe 2s infinite;
+}
+
+/* =========================================================
+   STORY
+========================================================= */
+
+.story{
+    border-top:1px solid rgba(255,255,255,.07);
+}
+
+.story-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:90px;
+    align-items:center;
+}
+
+.story-copy p{
+    color:#85858e;
+    margin-top:21px;
+    line-height:1.8;
+}
+
+.story-copy strong{
+    color:#e1e1e6;
+}
+
+.phone{
+    width:min(355px,86%);
+    aspect-ratio:9/18;
+    margin:auto;
+    padding:9px;
+    border-radius:46px;
+    background:linear-gradient(145deg,#29292f,#0b0b0e);
+    border:1px solid rgba(255,255,255,.13);
+    box-shadow:
+        0 45px 130px rgba(0,0,0,.7),
+        0 0 90px rgba(110,80,255,.08);
+    transform:
+        perspective(1000px)
+        rotateY(-15deg)
+        rotateX(5deg);
+    transition:transform 1s cubic-bezier(.2,.8,.2,1);
+}
+
+.phone:hover{
+    transform:
+        perspective(1000px)
+        rotateY(0)
+        rotateX(0)
+        translateY(-12px);
+}
+
+.phone-screen{
+    height:100%;
+    border-radius:38px;
+    overflow:hidden;
+    background:
+        radial-gradient(
+            circle at 50% 10%,
+            rgba(125,95,255,.25),
+            transparent 30%
+        ),
+        #08080b;
+}
+
+.phone-head{
+    padding:31px 20px 13px;
+}
+
+.phone-head small{
+    color:#66666e;
+    font-size:9px;
+}
+
+.phone-head h3{
+    margin-top:6px;
+    font-size:23px;
+}
+
+.media-card{
+    margin:15px;
+    height:155px;
+    border-radius:22px;
+    position:relative;
+    overflow:hidden;
+    background:
+        radial-gradient(
+            circle at 75% 25%,
+            rgba(50,220,255,.2),
+            transparent 30%
+        ),
+        linear-gradient(
+            135deg,
+            rgba(125,92,255,.45),
+            rgba(255,255,255,.025)
+        );
+    border:1px solid rgba(255,255,255,.08);
+}
+
+.media-card::after{
+    content:"▶";
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:54px;
+    height:54px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    background:rgba(255,255,255,.1);
+    backdrop-filter:blur(10px);
+    font-size:14px;
+}
+
+.fake-line{
+    height:8px;
+    margin:12px 20px;
+    border-radius:10px;
+    background:rgba(255,255,255,.05);
+}
+
+.fake-line.short{
+    width:45%;
+}
+
+.fake-row{
+    display:flex;
+    gap:9px;
+    margin:15px;
+}
+
+.fake-box{
+    flex:1;
+    height:67px;
+    border-radius:16px;
+    background:rgba(255,255,255,.04);
+}
+
+/* =========================================================
+   FEATURES
+========================================================= */
+
+.features-section{
+    border-top:1px solid rgba(255,255,255,.07);
+}
+
+.feature-grid{
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:15px;
+    margin-top:60px;
+}
+
+.feature{
+    grid-column:span 4;
+    min-height:235px;
+    padding:30px;
+    border-radius:26px;
+    border:1px solid rgba(255,255,255,.08);
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,.055),
+            rgba(255,255,255,.015)
+        );
+    position:relative;
+    overflow:hidden;
+    transition:
+        transform .4s cubic-bezier(.2,.8,.2,1),
+        border-color .4s,
+        box-shadow .4s;
+}
+
+.feature.wide{
+    grid-column:span 8;
+}
+
+.feature:hover{
+    transform:translateY(-9px);
+    border-color:rgba(133,105,255,.36);
+    box-shadow:0 30px 100px rgba(0,0,0,.3);
+}
+
+.feature::before{
+    content:"";
+    position:absolute;
+    width:220px;
+    height:220px;
+    top:-140px;
+    right:-100px;
+    border-radius:50%;
+    background:radial-gradient(
+        circle,
+        rgba(120,90,255,.18),
+        transparent 68%
+    );
+    transition:.6s;
+}
+
+.feature:hover::before{
+    transform:scale(1.5);
+}
+
+.feature-icon{
+    width:45px;
+    height:45px;
+    border-radius:14px;
+    display:grid;
+    place-items:center;
+    background:rgba(125,95,255,.09);
+    border:1px solid rgba(125,95,255,.13);
+    color:#b9adff;
+    font-size:15px;
+    margin-bottom:28px;
+}
+
+.feature h3{
+    font-size:20px;
+    margin-bottom:10px;
+}
+
+.feature p{
+    color:#7f7f89;
+    font-size:14px;
+    line-height:1.7;
+    max-width:560px;
+}
+
+/* =========================================================
+   PLAYER
+========================================================= */
+
+.player-section{
+    border-top:1px solid rgba(255,255,255,.07);
+    border-bottom:1px solid rgba(255,255,255,.07);
+}
+
+.player{
+    margin-top:60px;
+    border-radius:33px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.1);
+    background:#08080b;
+    box-shadow:0 45px 110px rgba(0,0,0,.4);
+}
+
+.player-display{
+    height:480px;
+    position:relative;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    overflow:hidden;
+    background:
+        radial-gradient(
+            circle at 50% 50%,
+            rgba(120,90,255,.17),
+            transparent 32%
+        ),
+        linear-gradient(
+            135deg,
+            #07070a,
+            #111117
+        );
+}
+
+.player-stars{
+    position:absolute;
+    inset:0;
+    background-image:
+        radial-gradient(circle,rgba(255,255,255,.3) 1px,transparent 1px);
+    background-size:75px 75px;
+    opacity:.12;
+    animation:starMove 8s linear infinite;
+}
+
+.player-ring{
+    width:250px;
+    height:250px;
+    border:1px solid rgba(140,110,255,.16);
+    border-radius:50%;
+    animation:spin 14s linear infinite;
+}
+
+.player-ring::before{
+    content:"";
+    position:absolute;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:#9276ff;
+    box-shadow:0 0 30px #9276ff;
+    transform:translate(120px,20px);
+}
+
+.player-core{
+    position:absolute;
+    width:88px;
+    height:88px;
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.17);
+    backdrop-filter:blur(15px);
+    cursor:pointer;
+    transition:.3s;
+}
+
+.player-core:hover{
+    transform:scale(1.12);
+    background:rgba(255,255,255,.12);
+}
+
+.player-core::after{
+    content:"▶";
+    margin-left:4px;
+}
+
+.player-controls{
+    padding:20px;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    border-top:1px solid rgba(255,255,255,.07);
+}
+
+.player-time{
+    color:#64646d;
+    font-size:10px;
+}
+
+.player-progress{
+    flex:1;
+    height:3px;
+    background:#222228;
+    border-radius:20px;
+    overflow:hidden;
+}
+
+.player-progress span{
+    display:block;
+    width:37%;
+    height:100%;
+    background:linear-gradient(90deg,#8062ff,#4ce0ff);
+}
+
+/* =========================================================
+   TECHNOLOGY
+========================================================= */
+
+.tech-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:15px;
+    margin-top:55px;
+}
+
+.tech-card{
+    padding:32px;
+    border-radius:24px;
+    border:1px solid rgba(255,255,255,.08);
+    background:rgba(255,255,255,.025);
+    transition:.3s;
+}
+
+.tech-card:hover{
+    transform:translateY(-6px);
+    border-color:rgba(255,255,255,.13);
+}
+
+.tech-card small{
+    color:#61616a;
+    font-size:10px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+}
+
+.tech-card h3{
+    margin-top:12px;
+    font-size:21px;
+}
+
+.tech-card p{
+    color:#7f7f89;
+    margin-top:9px;
+    line-height:1.7;
+    font-size:14px;
+}
+
+.formats{
+    display:flex;
+    flex-wrap:wrap;
+    gap:9px;
+    margin-top:38px;
+}
+
+.format{
+    padding:10px 14px;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:100px;
+    color:#91919a;
+    background:rgba(255,255,255,.025);
+    font-size:12px;
+    transition:.25s;
+}
+
+.format:hover{
+    color:white;
+    transform:translateY(-4px) scale(1.04);
+    border-color:rgba(135,105,255,.35);
+}
+
+/* =========================================================
+   FINAL DOWNLOAD
+========================================================= */
+
+.download-section{
+    text-align:center;
+}
+
+.download-box{
+    position:relative;
+    overflow:hidden;
+    padding:120px 25px;
+    border-radius:38px;
+    border:1px solid rgba(255,255,255,.1);
+    background:
+        radial-gradient(
+            circle at 50% 0%,
+            rgba(120,85,255,.2),
+            transparent 55%
+        ),
+        rgba(255,255,255,.025);
+}
+
+.download-box::before,
+.download-box::after{
+    content:"";
+    position:absolute;
+    left:50%;
+    top:50%;
+    border:1px solid rgba(255,255,255,.04);
+    border-radius:50%;
+    pointer-events:none;
+}
+
+.download-box::before{
+    width:450px;
+    height:450px;
+    transform:translate(-50%,-50%);
+    animation:pulse 5s ease-in-out infinite;
+}
+
+.download-box::after{
+    width:700px;
+    height:700px;
+    transform:translate(-50%,-50%);
+    animation:pulse 5s ease-in-out 1s infinite;
+}
+
+.download-content{
+    position:relative;
+    z-index:3;
+}
+
+.download-box .title{
+    margin:auto;
+}
+
+.download-box p{
+    max-width:550px;
+    margin:22px auto 32px;
+    color:#85858e;
+}
+
+.download-main{
+    padding:17px 30px;
+    box-shadow:0 15px 60px rgba(255,255,255,.08);
+}
+
+.download-note{
+    margin-top:18px;
+    color:#55555d;
+    font-size:11px;
+}
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+footer{
+    border-top:1px solid rgba(255,255,255,.07);
+    padding:38px 0;
+    color:#5a5a62;
+    font-size:11px;
+}
+
+.footer{
+    display:flex;
+    justify-content:space-between;
+    gap:20px;
+}
+
+/* =========================================================
+   REVEAL
+========================================================= */
+
+.reveal{
+    opacity:0;
+    transform:translateY(45px) scale(.98);
+    transition:
+        opacity .9s ease,
+        transform .9s cubic-bezier(.2,.8,.2,1);
+}
+
+.reveal.visible{
+    opacity:1;
+    transform:translateY(0) scale(1);
+}
+
+/* =========================================================
+   KEYFRAMES
+========================================================= */
+
+@keyframes bootGrid{
+    from{background-position:0 0}
+    to{background-position:0 60px}
+}
+
+@keyframes bootGlow{
+    0%,100%{transform:scale(.9);opacity:.65}
+    50%{transform:scale(1.15);opacity:1}
+}
+
+@keyframes ringExpand{
+    from{
+        opacity:0;
+        transform:scale(.35);
+    }
+    to{
+        opacity:1;
+        transform:scale(1);
+    }
+}
+
+@keyframes coreIn{
+    from{
+        opacity:0;
+        transform:scale(.65) translateY(30px);
+    }
+    to{
+        opacity:1;
+        transform:scale(1) translateY(0);
+    }
+}
+
+@keyframes logoFloat{
+    0%,100%{transform:translateY(0)}
+    50%{transform:translateY(-7px)}
+}
+
+@keyframes logoSweep{
+    from{transform:rotate(-45deg) translateX(-130%)}
+    to{transform:rotate(-45deg) translateX(150%)}
+}
+
+@keyframes bootProgress{
+    to{transform:translateX(100%)}
+}
+
+@keyframes statusText{
+    0%{content:"initializing"}
+    25%{content:"loading interface"}
+    50%{content:"starting flux"}
+    75%{content:"ready"}
+    100%{content:"ready"}
+}
+
+@keyframes particleFly{
+    0%{
+        opacity:0;
+        transform:
+            translate3d(
+                calc((var(--x) - 50) * 1vw),
+                110vh,
+                0
+            )
+            scale(.4);
+    }
+
+    15%{
+        opacity:var(--opacity);
+    }
+
+    85%{
+        opacity:var(--opacity);
+    }
+
+    100%{
+        opacity:0;
+        transform:
+            translate3d(
+                calc((var(--x2) - 50) * 1vw),
+                -20vh,
+                0
+            )
+            scale(1);
+    }
+}
+
+@keyframes heroGrid{
+    from{background-position:0 0}
+    to{background-position:0 70px}
+}
+
+@keyframes heroLight{
+    0%,100%{
+        transform:scale(1);
+        opacity:.7;
+    }
+    50%{
+        transform:scale(1.15);
+        opacity:1;
+    }
+}
+
+@keyframes spin{
+    to{transform:rotate(360deg)}
+}
+
+@keyframes gradientShift{
+    0%,100%{background-position:0% 50%}
+    50%{background-position:100% 50%}
+}
+
+@keyframes heroUp{
+    from{
+        opacity:0;
+        transform:translateY(35px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+@keyframes breathe{
+    0%,100%{opacity:.3}
+    50%{opacity:1}
+}
+
+@keyframes starMove{
+    from{transform:translateY(0)}
+    to{transform:translateY(75px)}
+}
+
+@keyframes pulse{
+    0%,100%{
+        opacity:.15;
+        transform:translate(-50%,-50%) scale(.72);
+    }
+    50%{
+        opacity:.5;
+        transform:translate(-50%,-50%) scale(1.05);
+    }
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media(max-width:800px){
+
+    nav{
+        height:64px;
+    }
+
+    .nav-links{
+        display:none;
+    }
+
+    .nav-download{
+        padding:9px 13px;
+    }
+
+    section{
+        padding:90px 0;
+    }
+
+    .hero h1{
+        letter-spacing:-7px;
+    }
+
+    .hero-text{
+        font-size:15px;
+    }
+
+    .hero-orbit{
+        width:350px;
+        height:350px;
+    }
+
+    .story-grid{
+        grid-template-columns:1fr;
+        gap:65px;
+    }
+
+    .feature-grid{
+        grid-template-columns:1fr;
+    }
+
+    .feature,
+    .feature.wide{
+        grid-column:span 1;
+    }
+
+    .player-display{
+        height:320px;
+    }
+
+    .tech-grid{
+        grid-template-columns:1fr;
+    }
+
+    .footer{
+        flex-direction:column;
+    }
+
+    .boot-name{
+        font-size:34px;
+    }
+
+    .flux-logo{
+        width:80px;
+        height:80px;
+        border-radius:24px;
+    }
+
+    .flux-logo::after{
+        border-top-width:12px;
+        border-bottom-width:12px;
+        border-left-width:18px;
+    }
+
+    .energy-ring{
+        width:220px;
+        height:220px;
+    }
+
+    .energy-ring.r2{
+        width:330px;
+        height:330px;
+    }
+
+    .energy-ring.r3{
+        width:450px;
+        height:450px;
+    }
+
+    .cursor-glow{
+        display:none;
+    }
+}
+
+@media(prefers-reduced-motion:reduce){
+
+    *,
+    *::before,
+    *::after{
+        animation-duration:.001ms !important;
+        animation-iteration-count:1 !important;
+        scroll-behavior:auto !important;
+        transition-duration:.001ms !important;
+    }
+}
+</style>
+</head>
+
+
+<body class="booting">
+
+
+<!-- =========================================================
+     CURSOR
+========================================================= -->
+
+<div class="cursor-glow" id="cursorGlow"></div>
+
+
+<!-- =========================================================
+     CINEMATIC BOOT
+========================================================= -->
+
+<div class="boot" id="boot">
+
+    <div class="boot-grid"></div>
+
+    <div class="boot-vignette"></div>
+
+    <div class="boot-glow"></div>
+
+    <div class="energy-ring"></div>
+    <div class="energy-ring r2"></div>
+    <div class="energy-ring r3"></div>
+
+
+    <div class="particles" id="bootParticles"></div>
+
+
+    <div class="boot-core">
+
+        <div class="flux-logo"></div>
+
+        <div class="boot-name">
+            FluxPlay
+        </div>
+
+        <div class="boot-caption">
+            Private Project
+        </div>
+
+    </div>
+
+
+    <div class="boot-status"></div>
+
+    <div class="boot-progress">
+        <span></span>
+    </div>
+
+</div>
+
+
+<!-- =========================================================
+     NAVIGATION
+========================================================= -->
+
+<nav>
+
+    <div class="nav">
+
+        <a href="#" class="brand">
+
+            <div class="brand-icon"></div>
+
+            FluxPlay
+
+        </a>
+
+
+        <div class="nav-links">
+
+            <a href="#about">About</a>
+            <a href="#features">Features</a>
+            <a href="#player">Player</a>
+            <a href="#tech">Technology</a>
+
+        </div>
+
+
+        <!-- REAL APK DOWNLOAD -->
+
+        <a
+            href="https://www.mediafire.com/file/x9piwbaxtro1bhd/FluxPlay.apk/file"
+            download="FluxPlay.apk"
+            class="nav-download"
+        >
+            Download APK
+        </a>
+
+    </div>
+
+</nav>
+
+
+<main>
+
+
+<!-- =========================================================
+     HERO
+========================================================= -->
+
+<section class="hero">
+
+    <div class="hero-grid"></div>
+
+    <div class="hero-light"></div>
+
+    <div class="hero-orbit"></div>
+
+
+    <div class="particles" id="heroParticles"></div>
+
+
+    <div class="container hero-content">
+
+        <div class="hero-badge">
+            PRIVATE ANDROID PROJECT • 2026
+        </div>
+
+
+        <h1>
+            This is<br>
+            <span class="gradient">FluxPlay.</span>
+        </h1>
+
+
+        <p class="hero-text">
+            A media player project built around streaming,
+            local playback, downloads, subtitles and the
+            controls I actually wanted.
+        </p>
+
+
+        <div class="hero-buttons">
+
+            <a
+                href="fluxplay.apk"
+                download="FluxPlay.apk"
+                class="button primary"
+            >
+                ↓ &nbsp; Download APK
+            </a>
+
+
+            <a
+                href="#features"
+                class="button secondary"
+            >
+                Explore the build
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <div class="scroll-hint">
+        Scroll to enter
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     STORY
+========================================================= -->
+
+<section id="about" class="story">
+
+    <div class="container story-grid">
+
+
+        <div class="story-copy reveal">
+
+            <div class="label">
+                The project
+            </div>
+
+
+            <h2 class="title">
+                An idea that<br>
+                became an app.
+            </h2>
+
+
+            <p>
+                FluxPlay started as a personal Android project
+                and grew into a full media playback experience.
+            </p>
+
+
+            <p>
+                Instead of trying to become another streaming
+                platform, the project focuses on something
+                simpler:
+                <strong>playing your media your way.</strong>
+            </p>
+
+
+            <p>
+                This website exists for one reason —
+                to show the project properly.
+            </p>
+
+        </div>
+
+
+        <div class="phone reveal">
+
+            <div class="phone-screen">
+
+                <div class="phone-head">
+
+                    <small>
+                        FLUXPLAY
+                    </small>
+
+                    <h3>
+                        Continue watching
+                    </h3>
+
+                </div>
+
+
+                <div class="media-card"></div>
+
+                <div class="fake-line"></div>
+
+                <div class="fake-line short"></div>
+
+
+                <div class="fake-row">
+
+                    <div class="fake-box"></div>
+                    <div class="fake-box"></div>
+
+                </div>
+
+
+                <div class="fake-row">
+
+                    <div class="fake-box"></div>
+                    <div class="fake-box"></div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     FEATURES
+========================================================= -->
+
+<section id="features" class="features-section">
+
+    <div class="container">
+
+        <div class="label">
+            Inside the build
+        </div>
+
+
+        <h2 class="title">
+            More than<br>
+            a play button.
+        </h2>
+
+
+        <p class="description">
+            The feature set is built around actual media
+            playback and management rather than filler.
+        </p>
+
+
+        <div class="feature-grid">
+
+
+            <div class="feature wide reveal">
+
+                <div class="feature-icon">
+                    ▶
+                </div>
+
+                <h3>
+                    Direct streaming
+                </h3>
+
+                <p>
+                    Play supported HTTP and HTTPS media
+                    sources directly inside FluxPlay.
+                </p>
+
+            </div>
+
+
+            <div class="feature reveal">
+
+                <div class="feature-icon">
+                    ▣
+                </div>
+
+                <h3>
+                    Local playback
+                </h3>
+
+                <p>
+                    Open supported video and audio files
+                    stored on the device.
+                </p>
+
+            </div>
+
+
+            <div class="feature reveal">
+
+                <div class="feature-icon">
+                    CC
+                </div>
+
+                <h3>
+                    Subtitles
+                </h3>
+
+                <p>
+                    Embedded and external SRT, VTT and
+                    ASS/SSA subtitles.
+                </p>
+
+            </div>
+
+
+            <div class="feature reveal">
+
+                <div class="feature-icon">
+                    ↓
+                </div>
+
+                <h3>
+                    Downloads
+                </h3>
+
+                <p>
+                    Pause, resume, retry and cancel supported
+                    media downloads.
+                </p>
+
+            </div>
+
+
+            <div class="feature wide reveal">
+
+                <div class="feature-icon">
+                    ↔
+                </div>
+
+                <h3>
+                    Gesture controls
+                </h3>
+
+                <p>
+                    Seek through playback and adjust brightness
+                    and volume with gestures. Aspect ratio,
+                    orientation and other player controls are
+                    available without covering the entire screen.
+                </p>
+
+            </div>
+
+
+            <div class="feature reveal">
+
+                <div class="feature-icon">
+                    ↗
+                </div>
+
+                <h3>
+                    Picture-in-Picture
+                </h3>
+
+                <p>
+                    Keep compatible playback visible while
+                    using other applications.
+                </p>
+
+            </div>
+
+
+            <div class="feature reveal">
+
+                <div class="feature-icon">
+                    ★
+                </div>
+
+                <h3>
+                    History
+                </h3>
+
+                <p>
+                    Resume playback and keep track of
+                    previously played media.
+                </p>
+
+            </div>
+
+
+            <div class="feature reveal">
+
+                <div class="feature-icon">
+                    ☰
+                </div>
+
+                <h3>
+                    Playlists
+                </h3>
+
+                <p>
+                    Create and organize custom media
+                    collections.
+                </p>
+
+            </div>
+
+
+            <div class="feature reveal">
+
+                <div class="feature-icon">
+                    ◷
+                </div>
+
+                <h3>
+                    Sleep timer
+                </h3>
+
+                <p>
+                    Stop playback automatically after
+                    a selected amount of time.
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     PLAYER
+========================================================= -->
+
+<section id="player" class="player-section">
+
+    <div class="container">
+
+        <div class="label">
+            Player
+        </div>
+
+
+        <h2 class="title">
+            The screen<br>
+            is the focus.
+        </h2>
+
+
+        <p class="description">
+            FluxPlay keeps useful controls close while
+            letting the media remain the main event.
+        </p>
+
+
+        <div class="player reveal">
+
+            <div class="player-display">
+
+                <div class="player-stars"></div>
+
+                <div class="player-ring"></div>
+
+                <div
+                    class="player-core"
+                    id="playerCore"
+                    title="Interactive demo"
+                ></div>
+
+            </div>
+
+
+            <div class="player-controls">
+
+                <span class="player-time">
+                    00:00
+                </span>
+
+
+                <div class="player-progress">
+                    <span></span>
+                </div>
+
+
+                <span class="player-time">
+                    FluxPlay
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     TECHNOLOGY
+========================================================= -->
+
+<section id="tech">
+
+    <div class="container">
+
+        <div class="label">
+            Under the hood
+        </div>
+
+
+        <h2 class="title">
+            The technical<br>
+            side of the flex.
+        </h2>
+
+
+        <p class="description">
+            The current build uses a modern Android stack
+            with the previous libmpv dependency stack removed.
+        </p>
+
+
+        <div class="tech-grid">
+
+
+            <div class="tech-card reveal">
+
+                <small>
+                    UI
+                </small>
+
+                <h3>
+                    Kotlin + Jetpack Compose
+                </h3>
+
+                <p>
+                    Modern Android UI architecture with
+                    Compose-based screens and components.
+                </p>
+
+            </div>
+
+
+            <div class="tech-card reveal">
+
+                <small>
+                    Playback
+                </small>
+
+                <h3>
+                    Media3 / ExoPlayer
+                </h3>
+
+                <p>
+                    Android media playback using Media3 and
+                    the decoding capabilities available on
+                    the device.
+                </p>
+
+            </div>
+
+
+            <div class="tech-card reveal">
+
+                <small>
+                    Data
+                </small>
+
+                <h3>
+                    Room + StateFlow
+                </h3>
+
+                <p>
+                    Local persistence and reactive state
+                    handling for application data.
+                </p>
+
+            </div>
+
+
+            <div class="tech-card reveal">
+
+                <small>
+                    Architecture
+                </small>
+
+                <h3>
+                    ViewModel + Coroutines
+                </h3>
+
+                <p>
+                    Kotlin-based asynchronous work and
+                    structured application state.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div style="margin-top:80px">
+
+            <div class="label">
+                Media
+            </div>
+
+
+            <div class="formats">
+
+                <span class="format">MP4</span>
+                <span class="format">MKV</span>
+                <span class="format">WebM</span>
+                <span class="format">AVI</span>
+                <span class="format">TS</span>
+
+                <span class="format">MP3</span>
+                <span class="format">AAC</span>
+                <span class="format">FLAC</span>
+                <span class="format">OGG</span>
+
+                <span class="format">HLS</span>
+                <span class="format">DASH</span>
+                <span class="format">RTSP</span>
+
+                <span class="format">SRT</span>
+                <span class="format">VTT</span>
+                <span class="format">ASS / SSA</span>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================================
+     DOWNLOAD
+========================================================= -->
+
+<section id="download" class="download-section">
+
+    <div class="container">
+
+        <div class="download-box reveal">
+
+            <div class="download-content">
+
+                <div class="label">
+                    The actual build
+                </div>
+
+
+                <h2 class="title">
+                    Enough looking.<br>
+                    Open FluxPlay.
+                </h2>
+
+
+                <p>
+                    The website is the showcase.
+                    The APK is the project.
+                </p>
+
+
+                <!-- REAL APK DOWNLOAD LINK -->
+
+                <a
+                    href="fluxplay.apk"
+                    download="FluxPlay.apk"
+                    class="button primary download-main"
+                >
+                    ↓ &nbsp; Download FluxPlay APK
+                </a>
+
+
+                <div class="download-note">
+                    Android APK • Private build
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+</main>
+
+
+<!-- =========================================================
+     FOOTER
+========================================================= -->
+
+<footer>
+
+    <div class="container footer">
+
+        <span>
+            FluxPlay
+        </span>
+
+        <span>
+            Private project • 2026
+        </span>
+
+    </div>
+
+</footer>
+
+
+<script>
+
+/* =========================================================
+   PARTICLE GENERATOR
+========================================================= */
+
+function createParticles(containerId,count){
+
+    const container =
+        document.getElementById(containerId);
+
+    if(!container) return;
+
+    for(let i=0;i<count;i++){
+
+        const particle =
+            document.createElement("span");
+
+        particle.className="particle";
+
+        const x =
+            Math.random()*100;
+
+        const x2 =
+            Math.random()*100;
+
+        const duration =
+            5 + Math.random()*9;
+
+        const delay =
+            Math.random()*8;
+
+        const opacity =
+            .15 + Math.random()*.55;
+
+        particle.style.left=x+"%";
+
+        particle.style.setProperty(
+            "--x",
+            x
+        );
+
+        particle.style.setProperty(
+            "--x2",
+            x2
+        );
+
+        particle.style.setProperty(
+            "--duration",
+            duration+"s"
+        );
+
+        particle.style.setProperty(
+            "--delay",
+            "-"+delay+"s"
+        );
+
+        particle.style.setProperty(
+            "--opacity",
+            opacity
+        );
+
+        container.appendChild(particle);
+    }
+}
+
+createParticles("bootParticles",90);
+createParticles("heroParticles",55);
+
+
+/* =========================================================
+   BOOT SEQUENCE
+========================================================= */
+
+const boot =
+    document.getElementById("boot");
+
+setTimeout(() => {
+
+    boot.classList.add("finished");
+
+    document.body.classList.remove("booting");
+
+},3400);
+
+
+/* =========================================================
+   SCROLL REVEAL
+========================================================= */
+
+const revealObserver =
+    new IntersectionObserver(
+
+        entries => {
+
+            entries.forEach(entry => {
+
+                if(entry.isIntersecting){
+
+                    entry.target.classList.add("visible");
+
+                }
+
+            });
+
+        },
+
+        {
+            threshold:.1
+        }
+
+    );
+
+document
+    .querySelectorAll(".reveal")
+    .forEach(element => {
+
+        revealObserver.observe(element);
+
+    });
+
+
+/* =========================================================
+   CURSOR GLOW
+========================================================= */
+
+const cursor =
+    document.getElementById("cursorGlow");
+
+if(window.innerWidth > 800){
+
+    let mouseX=0;
+    let mouseY=0;
+    let currentX=0;
+    let currentY=0;
+
+    document.addEventListener("mousemove",event => {
+
+        mouseX=event.clientX;
+        mouseY=event.clientY;
+
+    });
+
+    function animateCursor(){
+
+        currentX +=
+            (mouseX-currentX)*.09;
+
+        currentY +=
+            (mouseY-currentY)*.09;
+
+        cursor.style.left=currentX+"px";
+        cursor.style.top=currentY+"px";
+
+        requestAnimationFrame(animateCursor);
+    }
+
+    animateCursor();
+}
+
+
+/* =========================================================
+   MAGNETIC BUTTONS
+========================================================= */
+
+document
+    .querySelectorAll(".button,.nav-download")
+    .forEach(button => {
+
+        button.addEventListener(
+            "mousemove",
+            event => {
+
+                if(window.innerWidth<=800)
+                    return;
+
+                const rect =
+                    button.getBoundingClientRect();
+
+                const x =
+                    event.clientX-
+                    rect.left-
+                    rect.width/2;
+
+                const y =
+                    event.clientY-
+                    rect.top-
+                    rect.height/2;
+
+                button.style.transform =
+                    `translate(${x*.10}px,${y*.10}px)`;
+
+            }
+        );
+
+        button.addEventListener(
+            "mouseleave",
+            () => {
+
+                button.style.transform="";
+
+            }
+        );
+
+    });
+
+
+/* =========================================================
+   PLAYER INTERACTION
+========================================================= */
+
+const playerCore =
+    document.getElementById("playerCore");
+
+playerCore.addEventListener("click",() => {
+
+    playerCore.animate(
+
+        [
+            {
+                transform:"scale(1)",
+                boxShadow:"0 0 0 rgba(130,100,255,0)"
+            },
+            {
+                transform:"scale(1.22)",
+                boxShadow:"0 0 70px rgba(130,100,255,.55)"
+            },
+            {
+                transform:"scale(1)",
+                boxShadow:"0 0 0 rgba(130,100,255,0)"
+            }
+        ],
+
+        {
+            duration:750,
+            easing:"cubic-bezier(.2,.8,.2,1)"
+        }
+
+    );
+
+});
+
+
+/* =========================================================
+   PHONE PARALLAX
+========================================================= */
+
+const phone =
+    document.querySelector(".phone");
+
+if(phone && window.innerWidth>800){
+
+    document.addEventListener("mousemove",event => {
+
+        const x =
+            event.clientX/window.innerWidth-.5;
+
+        const y =
+            event.clientY/window.innerHeight-.5;
+
+        phone.style.transform =
+            `
+            perspective(1000px)
+            rotateY(${x*-13-3}deg)
+            rotateX(${y*5}deg)
+            `;
+
+    });
+
+}
+
+
+/* =========================================================
+   SCROLL-BASED HERO DEPTH
+========================================================= */
+
+const heroContent =
+    document.querySelector(".hero-content");
+
+const heroGlow =
+    document.querySelector(".hero-light");
+
+window.addEventListener(
+    "scroll",
+    () => {
+
+        const scroll =
+            window.scrollY;
+
+        if(scroll < window.innerHeight){
+
+            heroContent.style.transform =
+                `translateY(${scroll*.12}px)`;
+
+            heroContent.style.opacity =
+                Math.max(
+                    0,
+                    1-scroll/(window.innerHeight*.8)
+                );
+
+            heroGlow.style.transform =
+                `translateY(${scroll*.08}px) scale(${1+scroll*.0002})`;
+        }
+
+    },
+    {passive:true}
+);
+
+
+/* =========================================================
+   CARD TILT
+========================================================= */
+
+if(window.innerWidth>800){
+
+    document
+        .querySelectorAll(".feature,.tech-card")
+        .forEach(card => {
+
+            card.addEventListener(
+                "mousemove",
+                event => {
+
+                    const rect =
+                        card.getBoundingClientRect();
+
+                    const x =
+                        event.clientX-rect.left;
+
+                    const y =
+                        event.clientY-rect.top;
+
+                    const rotateY =
+                        (x/rect.width-.5)*5;
+
+                    const rotateX =
+                        (y/rect.height-.5)*-5;
+
+                    card.style.transform =
+                        `
+                        translateY(-7px)
+                        perspective(800px)
+                        rotateX(${rotateX}deg)
+                        rotateY(${rotateY}deg)
+                        `;
+
+                }
+            );
+
+            card.addEventListener(
+                "mouseleave",
+                () => {
+
+                    card.style.transform="";
+
+                }
+            );
+
+        });
+
+}
+
+
+/* =========================================================
+   SMOOTH INTERNAL LINKS
+========================================================= */
+
+document
+    .querySelectorAll('a[href^="#"]')
+    .forEach(link => {
+
+        link.addEventListener(
+            "click",
+            event => {
+
+                const target =
+                    document.querySelector(
+                        link.getAttribute("href")
+                    );
+
+                if(!target)
+                    return;
+
+                event.preventDefault();
+
+                target.scrollIntoView({
+                    behavior:"smooth"
+                });
+
+            }
+        );
+
+    });
+
+</script>
+
+</body>
+</html>
