@@ -123,6 +123,9 @@ class PlayerViewModel(
                     settings = settings,
                     selectedEngine = settings.selectedEngine
                 )
+                if (prevEngine != settings.selectedEngine) {
+                    initExoPlayer(settings.selectedEngine)
+                }
                 if (!settings.notificationsEnabled) {
                     PlaybackNotificationHelper.dismissNotification(getApplication())
                 }

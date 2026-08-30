@@ -50,9 +50,15 @@ fun DiscoverScreen(
     var showImportM3uDialog by remember { mutableStateOf(false) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
             val fileName = getFileName(context, it)
             val item = MediaItemEntity(
                 url = it.toString(),
@@ -120,7 +126,7 @@ fun DiscoverScreen(
                         }
 
                         IconButton(
-                            onClick = { filePickerLauncher.launch("video/*") },
+                            onClick = { filePickerLauncher.launch(arrayOf("video/*", "audio/*", "application/octet-stream", "*/*")) },
                             modifier = Modifier
                                 .background(FluxSurfaceVariantDark, RoundedCornerShape(8.dp))
                                 .size(36.dp)
