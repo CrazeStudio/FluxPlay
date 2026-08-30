@@ -253,7 +253,11 @@ fun DiscoverScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize().testTag("streams_list")
             ) {
-                items(state.filteredStreams, key = { it.url }) { item ->
+                items(
+                    count = state.filteredStreams.size,
+                    key = { index -> "${state.filteredStreams[index].providerId}_${state.filteredStreams[index].url}_$index" }
+                ) { index ->
+                    val item = state.filteredStreams[index]
                     Surface(
                         color = FluxCardDark,
                         shape = RoundedCornerShape(12.dp),

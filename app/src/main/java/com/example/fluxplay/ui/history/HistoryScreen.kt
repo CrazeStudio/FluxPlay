@@ -110,7 +110,11 @@ fun HistoryScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(historyItems, key = { it.url }) { item ->
+                items(
+                    count = historyItems.size,
+                    key = { index -> "${historyItems[index].providerId}_${historyItems[index].url}_$index" }
+                ) { index ->
+                    val item = historyItems[index]
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -175,7 +179,11 @@ fun HistoryScreen(
                                     fontSize = 10.sp
                                 )
                                 if (item.durationSeconds > 0) {
-                                    val progressRatio = (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                    val progressRatio = try {
+                                        (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                    } catch (_: Exception) {
+                                        0f
+                                    }
                                     LinearProgressIndicator(
                                         progress = { progressRatio },
                                         modifier = Modifier

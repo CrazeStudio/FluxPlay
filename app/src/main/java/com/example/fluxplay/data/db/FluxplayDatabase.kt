@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import com.example.fluxplay.data.model.DownloadItemEntity
 import com.example.fluxplay.data.model.MediaItemEntity
 
-@Database(entities = [MediaItemEntity::class, DownloadItemEntity::class], version = 2, exportSchema = false)
+@Database(entities = [MediaItemEntity::class, DownloadItemEntity::class], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class FluxplayDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao

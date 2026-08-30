@@ -47,6 +47,7 @@ fun SettingsScreen(
     var showClearBookmarksDialog by remember { mutableStateOf(false) }
     var showClearDownloadsDialog by remember { mutableStateOf(false) }
     var showCleanCacheDialog by remember { mutableStateOf(false) }
+    var showResetUserDataDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshCacheSize()
@@ -544,6 +545,20 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Delete All Downloaded Videos ($downloadsSize)", color = FluxTextPrimary)
                     }
+
+                    Button(
+                        onClick = { showResetUserDataDialog = true },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("btn_reset_user_data")
+                    ) {
+                        Icon(Icons.Filled.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Erase All User Data & Reset", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
@@ -661,6 +676,30 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearDownloadsDialog = false }) {
+                    Text("Cancel", color = FluxTextSecondary)
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    }
+
+    if (showResetUserDataDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetUserDataDialog = false },
+            title = { Text("Erase All User Data?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error) },
+            text = { Text("This will permanently clear your watch history, bookmarks, offline downloads, and streaming cache. Are you sure you want to proceed?", color = FluxTextSecondary) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetAllUserData {
+                        Toast.makeText(context, "All user data & cache wiped", Toast.LENGTH_SHORT).show()
+                    }
+                    showResetUserDataDialog = false
+                }) {
+                    Text("Erase Everything", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetUserDataDialog = false }) {
                     Text("Cancel", color = FluxTextSecondary)
                 }
             },

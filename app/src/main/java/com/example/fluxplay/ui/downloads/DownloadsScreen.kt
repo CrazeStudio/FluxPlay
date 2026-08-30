@@ -251,7 +251,11 @@ fun DownloadsScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(downloads, key = { it.id }) { item ->
+                    items(
+                        count = downloads.size,
+                        key = { index -> "${downloads[index].id}_$index" }
+                    ) { index ->
+                        val item = downloads[index]
                         DownloadItemCard(
                             item = item,
                             onClick = {
@@ -426,7 +430,7 @@ private fun DownloadItemCard(
                         }
                     } else if (isDownloading) {
                         CircularProgressIndicator(
-                            progress = { item.progressPercent / 100f },
+                            progress = { (item.progressPercent.coerceIn(0, 100) / 100f) },
                             modifier = Modifier.size(26.dp),
                             strokeWidth = 3.dp,
                             color = MaterialTheme.colorScheme.primary
@@ -522,7 +526,7 @@ private fun DownloadItemCard(
             if (isDownloading) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = { item.progressPercent / 100f },
+                    progress = { (item.progressPercent.coerceIn(0, 100) / 100f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(5.dp)
@@ -638,6 +642,14 @@ private fun DownloadUrlDialog(
 private fun formatBytes(bytes: Long): String {
     if (bytes <= 0) return "0 B"
     val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
-    return String.format("%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+    val digitGroups = try {
+        (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
+    } catch (_: Exception) {
+        0
+    }
+    return try {
+        String.format(java.util.Locale.US, "%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+    } catch (_: Exception) {
+        "$bytes B"
+    }
 }

@@ -59,13 +59,21 @@ class DownloadsViewModel(
     }
 
     fun deleteDownload(item: DownloadItemEntity) {
-        downloadRepository.deleteDownload(item)
-        refreshStorage()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                downloadRepository.deleteDownload(item)
+            }
+            refreshStorage()
+        }
     }
 
     fun deleteAllDownloads() {
-        downloadRepository.deleteAllDownloads()
-        refreshStorage()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                downloadRepository.deleteAllDownloads()
+            }
+            refreshStorage()
+        }
     }
 
     fun refreshStorage() {

@@ -54,7 +54,8 @@ enum class NavigationTab(
     PLAYER("Player", Icons.Filled.PlayCircle, Icons.Outlined.PlayCircleOutline, "nav_tab_player"),
     STREAMS("Streams", Icons.Filled.VideoLibrary, Icons.Outlined.VideoLibrary, "nav_tab_streams"),
     DOWNLOADS("Downloads", Icons.Filled.Download, Icons.Outlined.Download, "nav_tab_downloads"),
-    BOOKMARKS("Saved", Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder, "nav_tab_bookmarks")
+    BOOKMARKS("Saved", Icons.Filled.Bookmark, Icons.Outlined.BookmarkBorder, "nav_tab_bookmarks"),
+    SETTINGS("Settings", Icons.Filled.Settings, Icons.Outlined.Settings, "nav_tab_settings")
 }
 
 class MainActivity : ComponentActivity() {
@@ -299,7 +300,7 @@ fun FluxplayMainApp(
                     containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 8.dp
                 ) {
-                    NavigationTab.values().forEach { tab ->
+                    NavigationTab.entries.forEach { tab ->
                         val isSelected = selectedTab == tab
                         NavigationBarItem(
                             selected = isSelected,
@@ -366,6 +367,13 @@ fun FluxplayMainApp(
                         selectedTab = NavigationTab.PLAYER
                     },
                     modifier = contentModifier
+                )
+            }
+            NavigationTab.SETTINGS -> {
+                SettingsScreen(
+                    viewModel = settingsViewModel,
+                    modifier = contentModifier,
+                    onBack = { selectedTab = NavigationTab.PLAYER }
                 )
             }
         }

@@ -95,7 +95,11 @@ fun BookmarksScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(bookmarks, key = { it.url }) { item ->
+                items(
+                    count = bookmarks.size,
+                    key = { index -> "${bookmarks[index].providerId}_${bookmarks[index].url}_$index" }
+                ) { index ->
+                    val item = bookmarks[index]
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

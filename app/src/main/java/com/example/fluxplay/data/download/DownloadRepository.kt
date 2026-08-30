@@ -31,7 +31,8 @@ class DownloadRepository(
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
+            .connectionPool(okhttp3.ConnectionPool(8, 2, TimeUnit.MINUTES))
+            .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
@@ -40,12 +41,24 @@ class DownloadRepository(
     }
 
     private fun getDownloadsDir(): File {
-        val dir = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
-            ?: File(context.filesDir, "downloads")
-        if (!dir.exists()) {
-            dir.mkdirs()
+        val candidates = listOf(
+            try { context.getExternalFilesDir(Environment.DIRECTORY_MOVIES) } catch (_: Exception) { null },
+            try { context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) } catch (_: Exception) { null },
+            try { File(context.filesDir, "downloads") } catch (_: Exception) { null }
+        )
+        for (candidate in candidates) {
+            if (candidate != null) {
+                if (!candidate.exists()) {
+                    candidate.mkdirs()
+                }
+                if (candidate.exists() && candidate.canWrite()) {
+                    return candidate
+                }
+            }
         }
-        return dir
+        val fallback = File(context.filesDir, "downloads")
+        fallback.mkdirs()
+        return fallback
     }
 
     fun startDownload(url: String, customTitle: String? = null, poster: String = ""): String {
@@ -63,6 +76,7 @@ class DownloadRepository(
             cleanUrl.contains(".ts", ignoreCase = true) -> ".ts"
             cleanUrl.contains(".mov", ignoreCase = true) -> ".mov"
             cleanUrl.contains(".m4v", ignoreCase = true) -> ".m4v"
+            cleanUrl.contains(".m3u8", ignoreCase = true) -> ".mp4"
             else -> ".mp4"
         }
 
@@ -100,21 +114,30 @@ class DownloadRepository(
             var contentLength = -1L
 
             try {
+                // Ensure parent directory exists
+                destinationFile.parentFile?.mkdirs()
+
                 val request = Request.Builder()
                     .url(item.url)
-                    .header("User-Agent", "FluxPlay/2.0 (Android; Universal Media Player)")
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
+                    .header("Accept", "*/*")
+                    .header("Connection", "keep-alive")
                     .build()
 
                 val response = okHttpClient.newCall(request).execute()
                 if (!response.isSuccessful) {
-                    throw Exception("HTTP error code: ${response.code}")
+                    response.close()
+                    throw Exception("HTTP ${response.code}: ${response.message}")
                 }
 
-                val body = response.body ?: throw Exception("Empty response body from server")
+                val body = response.body ?: run {
+                    response.close()
+                    throw Exception("Empty response body from server")
+                }
                 contentLength = body.contentLength()
 
                 outputStream = FileOutputStream(destinationFile)
-                val buffer = ByteArray(32 * 1024)
+                val buffer = ByteArray(64 * 1024)
                 var bytesRead: Int
                 val inputStream = body.byteStream()
 
@@ -122,51 +145,66 @@ class DownloadRepository(
                 var bytesSinceLastUpdate = 0L
                 var currentSpeed = "0 KB/s"
 
-                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    if (!isActive) {
-                        outputStream.close()
-                        destinationFile.delete()
-                        downloadDao.updateStatus(item.id, DownloadStatus.CANCELLED)
-                        return@launch
-                    }
-
-                    outputStream.write(buffer, 0, bytesRead)
-                    totalBytesRead += bytesRead
-                    bytesSinceLastUpdate += bytesRead
-
-                    val now = System.currentTimeMillis()
-                    val timeDiff = now - lastUpdateTime
-
-                    if (timeDiff >= 400) {
-                        val speedBps = (bytesSinceLastUpdate * 1000) / timeDiff.coerceAtLeast(1)
-                        currentSpeed = formatSpeed(speedBps)
-
-                        val percent = if (contentLength > 0) {
-                            ((totalBytesRead * 100) / contentLength).toInt().coerceIn(0, 100)
-                        } else {
-                            0
+                try {
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        if (!isActive) {
+                            try {
+                                outputStream.close()
+                            } catch (_: Exception) {}
+                            try {
+                                destinationFile.delete()
+                            } catch (_: Exception) {}
+                            downloadDao.updateStatus(item.id, DownloadStatus.CANCELLED)
+                            return@launch
                         }
 
-                        downloadDao.updateProgress(
-                            id = item.id,
-                            downloaded = totalBytesRead,
-                            total = if (contentLength > 0) contentLength else totalBytesRead,
-                            percent = percent,
-                            speed = currentSpeed,
-                            status = DownloadStatus.DOWNLOADING
-                        )
+                        outputStream.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        bytesSinceLastUpdate += bytesRead
 
-                        lastUpdateTime = now
-                        bytesSinceLastUpdate = 0L
+                        val now = System.currentTimeMillis()
+                        val timeDiff = now - lastUpdateTime
+
+                        if (timeDiff >= 800) {
+                            val speedBps = (bytesSinceLastUpdate * 1000) / timeDiff.coerceAtLeast(1)
+                            currentSpeed = formatSpeed(speedBps)
+
+                            val percent = if (contentLength > 0) {
+                                ((totalBytesRead * 100) / contentLength).toInt().coerceIn(0, 100)
+                            } else {
+                                0
+                            }
+
+                            downloadDao.updateProgress(
+                                id = item.id,
+                                downloaded = totalBytesRead,
+                                total = if (contentLength > 0) contentLength else totalBytesRead,
+                                percent = percent,
+                                speed = currentSpeed,
+                                status = DownloadStatus.DOWNLOADING
+                            )
+
+                            lastUpdateTime = now
+                            bytesSinceLastUpdate = 0L
+                        }
                     }
+                } finally {
+                    try { inputStream.close() } catch (_: Exception) {}
+                    try { response.close() } catch (_: Exception) {}
                 }
 
-                outputStream.flush()
-                outputStream.close()
+                try {
+                    outputStream.flush()
+                    outputStream.close()
+                } catch (_: Exception) {}
                 outputStream = null
 
-                // Completed successfully!
                 val finalSize = destinationFile.length()
+                if (finalSize <= 0) {
+                    throw Exception("Downloaded file is empty (0 bytes)")
+                }
+
+                // Completed successfully!
                 downloadDao.updateProgress(
                     id = item.id,
                     downloaded = finalSize,
@@ -205,6 +243,9 @@ class DownloadRepository(
             } catch (e: Exception) {
                 try {
                     outputStream?.close()
+                    if (destinationFile.exists() && destinationFile.length() == 0L) {
+                        destinationFile.delete()
+                    }
                 } catch (_: Exception) {}
                 downloadDao.updateStatus(
                     id = item.id,
@@ -226,7 +267,10 @@ class DownloadRepository(
             val item = downloadDao.getDownloadDirect(id)
             if (item != null) {
                 try {
-                    File(item.filePath).delete()
+                    val file = File(item.filePath)
+                    if (file.exists()) {
+                        file.delete()
+                    }
                 } catch (_: Exception) {}
                 downloadDao.updateStatus(id, DownloadStatus.CANCELLED)
             }
@@ -242,6 +286,7 @@ class DownloadRepository(
                     file.delete()
                 }
             } catch (_: Exception) {}
+            // Clean from database
             downloadDao.deleteById(item.id)
             mediaDao.deleteByUrl(item.filePath)
             mediaDao.deleteByUrl("file://${item.filePath}")
@@ -255,7 +300,20 @@ class DownloadRepository(
         scope.launch {
             try {
                 val dir = getDownloadsDir()
-                dir.listFiles()?.forEach { it.delete() }
+                dir.listFiles()?.forEach { 
+                    try {
+                        it.delete()
+                    } catch (_: Exception) {}
+                }
+            } catch (_: Exception) {}
+            // Also check internal files dir
+            try {
+                val internalDir = File(context.filesDir, "downloads")
+                internalDir.listFiles()?.forEach {
+                    try {
+                        it.delete()
+                    } catch (_: Exception) {}
+                }
             } catch (_: Exception) {}
             downloadDao.clearAll()
         }
@@ -270,22 +328,42 @@ class DownloadRepository(
                     total += it.length()
                 }
             }
+            val internalDir = File(context.filesDir, "downloads")
+            if (internalDir != dir && internalDir.exists()) {
+                internalDir.listFiles()?.forEach {
+                    if (it.isFile) {
+                        total += it.length()
+                    }
+                }
+            }
         } catch (_: Exception) {}
         return total
     }
 
     private fun formatSpeed(bytesPerSecond: Long): String {
-        return when {
-            bytesPerSecond >= 1024 * 1024 -> String.format("%.1f MB/s", bytesPerSecond / (1024.0 * 1024.0))
-            bytesPerSecond >= 1024 -> String.format("%.0f KB/s", bytesPerSecond / 1024.0)
-            else -> "$bytesPerSecond B/s"
+        return try {
+            when {
+                bytesPerSecond >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSecond / (1024.0 * 1024.0))
+                bytesPerSecond >= 1024 -> String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSecond / 1024.0)
+                else -> "$bytesPerSecond B/s"
+            }
+        } catch (_: Exception) {
+            "$bytesPerSecond B/s"
         }
     }
 
     fun formatSize(size: Long): String {
         if (size <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
-        return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+        val digitGroups = try {
+            (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
+        } catch (_: Exception) {
+            0
+        }
+        return try {
+            String.format(java.util.Locale.US, "%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+        } catch (_: Exception) {
+            "$size B"
+        }
     }
 }

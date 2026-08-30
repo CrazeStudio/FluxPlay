@@ -82,7 +82,7 @@ class SettingsViewModel(
     fun refreshCacheSize() {
         viewModelScope.launch {
             val cacheSize = withContext(Dispatchers.IO) {
-                getDirSize(getApplication<Application>().cacheDir)
+                calculateTotalCacheSize()
             }
             _cacheSizeFormatted.value = formatSize(cacheSize)
         }
@@ -112,19 +112,35 @@ class SettingsViewModel(
             _isCleaningCache.value = true
             _cacheCleanMessage.value = null
             
-            val freed = withContext(Dispatchers.IO) {
-                val cacheDir = getApplication<Application>().cacheDir
-                val before = getDirSize(cacheDir)
-                deleteDirContents(cacheDir)
-                val after = getDirSize(cacheDir)
-                formatSize((before - after).coerceAtLeast(0L))
+            val freedBytes = withContext(Dispatchers.IO) {
+                val before = calculateTotalCacheSize()
+                val app = getApplication<Application>()
+                
+                // 1. Internal cache directory
+                try {
+                    deleteDirContents(app.cacheDir)
+                } catch (_: Exception) {}
+                
+                // 2. External cache directory
+                try {
+                    deleteDirContents(app.externalCacheDir)
+                } catch (_: Exception) {}
+                
+                // 3. Code cache directory
+                try {
+                    deleteDirContents(app.codeCacheDir)
+                } catch (_: Exception) {}
+
+                val after = calculateTotalCacheSize()
+                (before - after).coerceAtLeast(0L)
             }
             
             refreshCacheSize()
             
+            val freedFormatted = formatSize(freedBytes)
             _isCleaningCache.value = false
-            _cacheCleanMessage.value = "Cache cleared successfully"
-            onComplete(freed)
+            _cacheCleanMessage.value = "Cleared $freedFormatted of cache"
+            onComplete(freedFormatted)
         }
     }
 
@@ -134,14 +150,51 @@ class SettingsViewModel(
 
     fun clearHistory() {
         viewModelScope.launch {
-            mediaRepository.clearHistory()
+            withContext(Dispatchers.IO) {
+                mediaRepository.clearHistory()
+            }
         }
     }
 
     fun clearBookmarks() {
         viewModelScope.launch {
-            mediaRepository.clearBookmarks()
+            withContext(Dispatchers.IO) {
+                mediaRepository.clearBookmarks()
+            }
         }
+    }
+
+    fun resetAllUserData(onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                mediaRepository.clearHistory()
+                mediaRepository.clearBookmarks()
+                downloadRepository.deleteAllDownloads()
+                
+                val app = getApplication<Application>()
+                try { deleteDirContents(app.cacheDir) } catch (_: Exception) {}
+                try { deleteDirContents(app.externalCacheDir) } catch (_: Exception) {}
+                try { deleteDirContents(app.codeCacheDir) } catch (_: Exception) {}
+            }
+            refreshCacheSize()
+            refreshDownloadsSize()
+            onComplete()
+        }
+    }
+
+    private fun calculateTotalCacheSize(): Long {
+        val app = getApplication<Application>()
+        var size = 0L
+        try {
+            size += getDirSize(app.cacheDir)
+        } catch (_: Exception) {}
+        try {
+            size += getDirSize(app.externalCacheDir)
+        } catch (_: Exception) {}
+        try {
+            size += getDirSize(app.codeCacheDir)
+        } catch (_: Exception) {}
+        return size
     }
 
     private fun getDirSize(dir: java.io.File?): Long {
@@ -166,9 +219,13 @@ class SettingsViewModel(
                 for (file in files) {
                     if (file.isDirectory) {
                         deleteDirContents(file)
-                        file.delete()
+                        try {
+                            file.delete()
+                        } catch (_: Exception) {}
                     } else {
-                        file.delete()
+                        try {
+                            file.delete()
+                        } catch (_: Exception) {}
                     }
                 }
             }
@@ -178,7 +235,15 @@ class SettingsViewModel(
     private fun formatSize(size: Long): String {
         if (size <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        val digitGroups = (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
-        return String.format("%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+        val digitGroups = try {
+            (Math.log10(size.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
+        } catch (_: Exception) {
+            0
+        }
+        return try {
+            String.format(java.util.Locale.US, "%.1f %s", size / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+        } catch (_: Exception) {
+            "$size B"
+        }
     }
 }

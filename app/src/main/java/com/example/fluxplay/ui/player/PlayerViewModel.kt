@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.*
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -95,9 +96,10 @@ class PlayerViewModel(
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     private val okHttpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+        okhttp3.OkHttpClient.Builder()
+            .connectionPool(okhttp3.ConnectionPool(8, 2, TimeUnit.MINUTES))
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .retryOnConnectionFailure(true)
@@ -109,6 +111,7 @@ class PlayerViewModel(
     private var progressTrackingJob: Job? = null
     private var gestureIndicatorDismissJob: Job? = null
     private var controlsHideJob: Job? = null
+    private var lastDbProgressSaveTimestamp = 0L
 
     init {
         initExoPlayer(_uiState.value.selectedEngine)
@@ -160,8 +163,18 @@ class PlayerViewModel(
             setEnableDecoderFallback(true)
         }
 
-        val httpDataSourceFactory = OkHttpDataSource.Factory(okHttpClient)
-            .setUserAgent("FluxPlay/2.0 (Android; Universal Media Player)")
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+            .setConnectTimeoutMs(20000)
+            .setReadTimeoutMs(25000)
+            .setAllowCrossProtocolRedirects(true)
+            .setKeepPostFor302Redirects(true)
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Accept" to "*/*",
+                    "Connection" to "keep-alive"
+                )
+            )
 
         val dataSourceFactory = DefaultDataSource.Factory(app, httpDataSourceFactory)
         val mediaSourceFactory = DefaultMediaSourceFactory(app)
@@ -171,34 +184,37 @@ class PlayerViewModel(
             PlayerEngine.JWPLAYER -> {
                 DefaultLoadControl.Builder()
                     .setBufferDurationsMs(
-                        2000,
-                        10000,
-                        500,
-                        1000
+                        3000,
+                        12000,
+                        300,
+                        800
                     )
+                    .setTargetBufferBytes(12 * 1024 * 1024)
                     .setPrioritizeTimeOverSizeThresholds(true)
                     .build()
             }
             PlayerEngine.MKV_HARDWARE -> {
                 DefaultLoadControl.Builder()
                     .setBufferDurationsMs(
-                        50000,
-                        120000,
-                        2500,
-                        5000
+                        15000,
+                        35000,
+                        500,
+                        1000
                     )
-                    .setTargetBufferBytes(64 * 1024 * 1024)
-                    .setPrioritizeTimeOverSizeThresholds(false)
+                    .setTargetBufferBytes(24 * 1024 * 1024)
+                    .setPrioritizeTimeOverSizeThresholds(true)
                     .build()
             }
             else -> {
                 DefaultLoadControl.Builder()
                     .setBufferDurationsMs(
+                        8000,
                         25000,
-                        50000,
-                        1500,
-                        3000
+                        400,
+                        900
                     )
+                    .setTargetBufferBytes(16 * 1024 * 1024)
+                    .setPrioritizeTimeOverSizeThresholds(true)
                     .build()
             }
         }
@@ -219,13 +235,7 @@ class PlayerViewModel(
             .build().apply {
                 playWhenReady = true
                 repeatMode = Player.REPEAT_MODE_OFF
-                setSeekParameters(
-                    when (engine) {
-                        PlayerEngine.JWPLAYER -> SeekParameters.CLOSEST_SYNC
-                        PlayerEngine.MKV_HARDWARE -> SeekParameters.EXACT
-                        else -> SeekParameters.DEFAULT
-                    }
-                )
+                setSeekParameters(SeekParameters.CLOSEST_SYNC)
                 addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
@@ -283,21 +293,30 @@ class PlayerViewModel(
 
     fun attachMpv(mpv: `is`.xyz.mpv.MPV) {
         this.mpvPlayer = mpv
-        val url = _uiState.value.currentMedia?.url ?: return
-        if (uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
+        val current = _uiState.value.currentMedia ?: return
+        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
             // Stop ExoPlayer to prevent two players playing simultaneously
             exoPlayer?.pause()
             exoPlayer?.clearMediaItems()
             
-            mpv.command("loadfile", url)
-            val resumePos = _uiState.value.currentPositionMs
-            if (resumePos > 0) {
-                mpv.setPropertyDouble("time-pos", resumePos / 1000.0)
-            }
-            if (_uiState.value.isPlaying) {
+            try {
+                mpv.command("loadfile", current.url)
+                val shouldResumeSec = if (current.durationSeconds > 0 && current.progressSeconds >= current.durationSeconds - 5) {
+                    0L
+                } else {
+                    current.progressSeconds
+                }
+                if (shouldResumeSec > 0) {
+                    mpv.setPropertyDouble("time-pos", shouldResumeSec.toDouble())
+                } else {
+                    mpv.setPropertyDouble("time-pos", 0.0)
+                }
                 mpv.setPropertyBoolean("pause", false)
+                _uiState.value = _uiState.value.copy(isPlaying = true, playbackError = null)
+                startProgressTracking()
+            } catch (e: Exception) {
+                setEngine(PlayerEngine.EXOPLAYER)
             }
-            startProgressTracking()
         }
     }
 
@@ -420,19 +439,21 @@ class PlayerViewModel(
         progressTrackingJob?.cancel()
         progressTrackingJob = viewModelScope.launch {
             while (isActive) {
+                val now = System.currentTimeMillis()
                 if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
                     mpvPlayer?.let { player ->
-                        val pos = ((player.getPropertyDouble("time-pos") ?: 0.0) * 1000).toLong()
-                        val dur = ((player.getPropertyDouble("duration") ?: 0.0) * 1000).toLong()
+                        val pos = ((player.getPropertyDouble("time-pos") ?: 0.0) * 1000).toLong().coerceAtLeast(0L)
+                        val dur = ((player.getPropertyDouble("duration") ?: 0.0) * 1000).toLong().coerceAtLeast(0L)
                         val isPaused = player.getPropertyBoolean("pause") ?: true
                         
                         _uiState.value = _uiState.value.copy(
                             currentPositionMs = pos,
                             durationMs = dur,
                             isPlaying = !isPaused,
-                            bufferedPositionMs = pos // MPV buffering is more complex to extract simply
+                            bufferedPositionMs = pos
                         )
-                        if (!isPaused && dur > 0) {
+                        if (!isPaused && dur > 0 && (now - lastDbProgressSaveTimestamp >= 3000L)) {
+                            lastDbProgressSaveTimestamp = now
                             _uiState.value.currentMedia?.let { media ->
                                 mediaRepository.updateProgress(
                                     url = media.url,
@@ -444,15 +465,16 @@ class PlayerViewModel(
                     }
                 } else {
                     exoPlayer?.let { player ->
-                        val pos = player.currentPosition
+                        val pos = player.currentPosition.coerceAtLeast(0L)
                         val dur = if (player.duration > 0) player.duration else 0L
-                        val buffered = player.bufferedPosition
+                        val buffered = player.bufferedPosition.coerceAtLeast(0L)
                         _uiState.value = _uiState.value.copy(
                             currentPositionMs = pos,
                             durationMs = dur,
                             bufferedPositionMs = buffered
                         )
-                        if (player.isPlaying && dur > 0) {
+                        if (player.isPlaying && dur > 0 && (now - lastDbProgressSaveTimestamp >= 3000L)) {
+                            lastDbProgressSaveTimestamp = now
                             _uiState.value.currentMedia?.let { media ->
                                 mediaRepository.updateProgress(
                                     url = media.url,
@@ -464,6 +486,23 @@ class PlayerViewModel(
                     }
                 }
                 delay(250)
+            }
+        }
+    }
+
+    private fun flushCurrentProgressToDb() {
+        val media = _uiState.value.currentMedia ?: return
+        val pos = _uiState.value.currentPositionMs
+        val dur = _uiState.value.durationMs
+        if (dur > 0) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    mediaRepository.updateProgress(
+                        url = media.url,
+                        progress = pos / 1000,
+                        duration = dur / 1000
+                    )
+                } catch (_: Exception) {}
             }
         }
     }
@@ -481,6 +520,7 @@ class PlayerViewModel(
     }
 
     fun loadMedia(media: MediaItemEntity) {
+        flushCurrentProgressToDb()
         val cleanTitle = MediaTitleFormatter.extractCleanTitle(media.title, media.url, getApplication())
         val cleanMedia = media.copy(title = cleanTitle)
 
@@ -490,6 +530,13 @@ class PlayerViewModel(
             isBuffering = true,
             areControlsVisible = true
         )
+
+        val shouldResumeSec = if (cleanMedia.durationSeconds > 0 && cleanMedia.progressSeconds >= cleanMedia.durationSeconds - 5) {
+            0L
+        } else {
+            cleanMedia.progressSeconds
+        }
+
         viewModelScope.launch {
             mediaRepository.saveOrUpdateMedia(cleanMedia)
             if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
@@ -498,8 +545,10 @@ class PlayerViewModel(
                 exoPlayer?.clearMediaItems()
                 mpvPlayer?.let { player ->
                     player.command("loadfile", cleanMedia.url)
-                    if (cleanMedia.progressSeconds > 0) {
-                        player.setPropertyDouble("time-pos", cleanMedia.progressSeconds.toDouble())
+                    if (shouldResumeSec > 0) {
+                        player.setPropertyDouble("time-pos", shouldResumeSec.toDouble())
+                    } else {
+                        player.setPropertyDouble("time-pos", 0.0)
                     }
                     player.setPropertyBoolean("pause", false)
                     _uiState.value = _uiState.value.copy(isPlaying = true)
@@ -525,8 +574,10 @@ class PlayerViewModel(
     
                         player.setMediaItem(mediaItem)
                         player.prepare()
-                        if (cleanMedia.progressSeconds > 0) {
-                            player.seekTo(cleanMedia.progressSeconds * 1000)
+                        if (shouldResumeSec > 0) {
+                            player.seekTo(shouldResumeSec * 1000)
+                        } else {
+                            player.seekTo(0)
                         }
                         player.play()
                         updatePlaybackNotification()
@@ -540,24 +591,31 @@ class PlayerViewModel(
                 }
             }
 
-            // Asynchronously check for embedded container metadata tags (MKV/MP4/ID3)
-            launch(Dispatchers.IO) {
-                try {
-                    val retriever = android.media.MediaMetadataRetriever()
-                    if (cleanMedia.url.startsWith("content://")) {
-                        retriever.setDataSource(getApplication(), Uri.parse(cleanMedia.url))
-                    } else if (cleanMedia.url.startsWith("file://") || cleanMedia.url.startsWith("/")) {
-                        retriever.setDataSource(cleanMedia.url.removePrefix("file://"))
-                    }
-                    val embeddedTitle = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
-                    retriever.release()
-                    if (!embeddedTitle.isNullOrBlank()) {
-                        val formatted = MediaTitleFormatter.extractCleanTitle(embeddedTitle, cleanMedia.url, getApplication())
-                        withContext(Dispatchers.Main) {
-                            updateCurrentMediaTitle(formatted)
+            // Asynchronously check for embedded container metadata tags on local files only
+            if (cleanMedia.url.startsWith("content://") || cleanMedia.url.startsWith("file://") || cleanMedia.url.startsWith("/")) {
+                launch(Dispatchers.IO) {
+                    var retriever: android.media.MediaMetadataRetriever? = null
+                    try {
+                        retriever = android.media.MediaMetadataRetriever()
+                        if (cleanMedia.url.startsWith("content://")) {
+                            retriever.setDataSource(getApplication(), Uri.parse(cleanMedia.url))
+                        } else {
+                            retriever.setDataSource(cleanMedia.url.removePrefix("file://"))
                         }
+                        val embeddedTitle = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)
+                        if (!embeddedTitle.isNullOrBlank()) {
+                            val formatted = MediaTitleFormatter.extractCleanTitle(embeddedTitle, cleanMedia.url, getApplication())
+                            withContext(Dispatchers.Main) {
+                                updateCurrentMediaTitle(formatted)
+                            }
+                        }
+                    } catch (_: Exception) {
+                    } finally {
+                        try {
+                            retriever?.release()
+                        } catch (_: Exception) {}
                     }
-                } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -605,52 +663,108 @@ class PlayerViewModel(
     }
 
     fun retryCurrentMedia() {
-        _uiState.value.currentMedia?.let { loadMedia(it) }
+        val current = _uiState.value.currentMedia ?: return
+        val fresh = current.copy(progressSeconds = 0)
+        _uiState.value = _uiState.value.copy(
+            playbackError = null,
+            currentPositionMs = 0L,
+            isBuffering = true
+        )
+        loadMedia(fresh)
     }
 
     fun play() {
-        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-            mpvPlayer?.setPropertyBoolean("pause", false)
-            _uiState.value = _uiState.value.copy(isPlaying = true)
-            updatePlaybackNotification()
-            scheduleControlsAutoHide()
-            return
+        val current = _uiState.value.currentMedia
+        if (current != null) {
+            if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
+                mpvPlayer?.let { player ->
+                    val pos = (player.getPropertyDouble("time-pos") ?: 0.0) * 1000
+                    val dur = (player.getPropertyDouble("duration") ?: 0.0) * 1000
+                    if (dur > 0 && pos >= dur - 3000) {
+                        player.setPropertyDouble("time-pos", 0.0)
+                    }
+                    player.setPropertyBoolean("pause", false)
+                    _uiState.value = _uiState.value.copy(isPlaying = true)
+                    updatePlaybackNotification()
+                    scheduleControlsAutoHide()
+                    return
+                } ?: run {
+                    loadMedia(current)
+                    return
+                }
+            } else {
+                exoPlayer?.let { player ->
+                    if (player.currentMediaItem == null || player.playbackState == Player.STATE_IDLE) {
+                        loadMedia(current)
+                        return
+                    }
+                    if (player.playbackState == Player.STATE_ENDED || (player.duration > 0 && player.currentPosition >= player.duration - 3000)) {
+                        player.seekTo(0)
+                    }
+                    player.play()
+                    scheduleControlsAutoHide()
+                    return
+                } ?: run {
+                    loadMedia(current)
+                    return
+                }
+            }
         }
-        exoPlayer?.play()
-        scheduleControlsAutoHide()
     }
 
     fun pause() {
         mpvPlayer?.setPropertyBoolean("pause", true)
         exoPlayer?.pause()
         _uiState.value = _uiState.value.copy(isPlaying = false)
+        flushCurrentProgressToDb()
         updatePlaybackNotification()
         setControlsVisibility(true)
     }
 
     fun togglePlayPause() {
+        val current = _uiState.value.currentMedia
         if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
             mpvPlayer?.let { player ->
-                val isPaused = player.getPropertyBoolean("pause") ?: false
-                player.setPropertyBoolean("pause", !isPaused)
-                _uiState.value = _uiState.value.copy(isPlaying = isPaused)
-                updatePlaybackNotification()
+                val isPaused = player.getPropertyBoolean("pause") ?: true
                 if (isPaused) {
+                    val pos = (player.getPropertyDouble("time-pos") ?: 0.0) * 1000
+                    val dur = (player.getPropertyDouble("duration") ?: 0.0) * 1000
+                    if (dur > 0 && pos >= dur - 3000) {
+                        player.setPropertyDouble("time-pos", 0.0)
+                    }
+                    player.setPropertyBoolean("pause", false)
+                    _uiState.value = _uiState.value.copy(isPlaying = true)
                     scheduleControlsAutoHide()
                 } else {
+                    player.setPropertyBoolean("pause", true)
+                    _uiState.value = _uiState.value.copy(isPlaying = false)
+                    flushCurrentProgressToDb()
                     setControlsVisibility(true)
                 }
+                updatePlaybackNotification()
+            } ?: run {
+                if (current != null) loadMedia(current)
             }
             return
         }
         exoPlayer?.let { player ->
+            if (player.currentMediaItem == null || player.playbackState == Player.STATE_IDLE) {
+                if (current != null) loadMedia(current)
+                return
+            }
             if (player.isPlaying) {
                 player.pause()
+                flushCurrentProgressToDb()
                 setControlsVisibility(true)
             } else {
+                if (player.playbackState == Player.STATE_ENDED || (player.duration > 0 && player.currentPosition >= player.duration - 3000)) {
+                    player.seekTo(0)
+                }
                 player.play()
                 scheduleControlsAutoHide()
             }
+        } ?: run {
+            if (current != null) loadMedia(current)
         }
     }
 
