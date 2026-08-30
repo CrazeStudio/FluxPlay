@@ -73,7 +73,6 @@ enum class AppThemeMode(val id: String, val displayName: String, val subtitle: S
 enum class PlayerEngine(val id: String, val displayName: String, val badge: String, val description: String) {
     EXOPLAYER("exoplayer", "Google Media3 Player", "Media3 Core", "Google's official native Android player with adaptive HLS/DASH/MP4 streaming"),
     JWPLAYER("jwplayer", "JW Player (JWX Real Engine)", "JWX Pro", "Authentic JWX ultra-low latency player engine with instant startup, JWX scrubber & buffer telemetry"),
-    LIBMPV("libmpv", "libmpv Engine (FFmpeg & ASS)", "libmpv", "High-performance FFmpeg-backed demuxing, stylised ASS subtitle rendering & dual-audio sync"),
     MKV_HARDWARE("mkv_hardware", "Ultra MKV & Codec Engine", "MKV Hardware", "Optimized hardware decoding for Matroska (MKV), HEVC/AV1, multi-audio & ASS subtitles"),
     VIMEO("vimeo", "Vimeo Cinematic", "Minimalist", "Ultra-clean borderless aesthetic with smooth center controls and glassmorphism")
 }

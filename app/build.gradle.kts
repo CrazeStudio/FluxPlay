@@ -95,8 +95,5 @@ dependencies {
     // Image loading
     implementation(libs.coil.compose)
 
-    // libmpv
-    implementation("io.github.abdallahmehiz:mpv-android-lib:0.1.12")
-
     debugImplementation(libs.androidx.ui.tooling)
 }

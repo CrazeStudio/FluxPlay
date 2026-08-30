@@ -198,51 +198,30 @@ fun PlayerScreen(
                     .background(Color.Black)
             }
         ) {
-            // Android Native Engine Surface (Never destroyed during fullscreen transition)
-            if (state.selectedEngine == PlayerEngine.LIBMPV) {
-                AndroidView(
-                    factory = { ctx ->
-                        com.example.fluxplay.ui.player.MPVPlayerViewWrapper(ctx).apply {
-                            layoutParams = FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            keepScreenOn = state.isPlaying
-                            initialize(ctx.filesDir.path, ctx.cacheDir.path)
-                            viewModel.attachMpv(this.mpv)
-                        }
-                    },
-                    update = { view ->
-                        view.keepScreenOn = state.isPlaying
-                    },
-                    onRelease = { it.destroy() },
-                    modifier = Modifier.fillMaxSize().testTag("mpv_view")
-                )
-            } else {
-                AndroidView(
-                    factory = { ctx ->
-                        PlayerView(ctx).apply {
-                            layoutParams = FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT
-                            )
-                            useController = false
-                            keepScreenOn = state.isPlaying
-                            setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                            resizeMode = state.resizeMode.exoMode
-                            player = viewModel.getExoPlayer()
-                        }
-                    },
-                    update = { view ->
-                        if (view.player != viewModel.getExoPlayer()) {
-                            view.player = viewModel.getExoPlayer()
-                        }
-                        view.keepScreenOn = state.isPlaying
-                        view.resizeMode = state.resizeMode.exoMode
-                    },
-                    modifier = Modifier.fillMaxSize().testTag("player_view")
-                )
-            }
+            // Ultra-smooth native hardware-accelerated Media3 Player Surface
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        layoutParams = FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        useController = false
+                        keepScreenOn = state.isPlaying
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                        resizeMode = state.resizeMode.exoMode
+                        player = viewModel.getExoPlayer()
+                    }
+                },
+                update = { view ->
+                    if (view.player != viewModel.getExoPlayer()) {
+                        view.player = viewModel.getExoPlayer()
+                    }
+                    view.keepScreenOn = state.isPlaying
+                    view.resizeMode = state.resizeMode.exoMode
+                },
+                modifier = Modifier.fillMaxSize().testTag("player_view")
+            )
 
             // Touch & Gesture Interaction Surface (Fullscreen & Portrait)
             Box(

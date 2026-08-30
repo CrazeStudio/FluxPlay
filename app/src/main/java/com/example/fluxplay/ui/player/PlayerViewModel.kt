@@ -107,7 +107,6 @@ class PlayerViewModel(
     }
 
     private var exoPlayer: ExoPlayer? = null
-    private var mpvPlayer: `is`.xyz.mpv.MPV? = null
     private var progressTrackingJob: Job? = null
     private var gestureIndicatorDismissJob: Job? = null
     private var controlsHideJob: Job? = null
@@ -291,35 +290,6 @@ class PlayerViewModel(
 
     fun getExoPlayer(): ExoPlayer? = exoPlayer
 
-    fun attachMpv(mpv: `is`.xyz.mpv.MPV) {
-        this.mpvPlayer = mpv
-        val current = _uiState.value.currentMedia ?: return
-        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-            // Stop ExoPlayer to prevent two players playing simultaneously
-            exoPlayer?.pause()
-            exoPlayer?.clearMediaItems()
-            
-            try {
-                mpv.command("loadfile", current.url)
-                val shouldResumeSec = if (current.durationSeconds > 0 && current.progressSeconds >= current.durationSeconds - 5) {
-                    0L
-                } else {
-                    current.progressSeconds
-                }
-                if (shouldResumeSec > 0) {
-                    mpv.setPropertyDouble("time-pos", shouldResumeSec.toDouble())
-                } else {
-                    mpv.setPropertyDouble("time-pos", 0.0)
-                }
-                mpv.setPropertyBoolean("pause", false)
-                _uiState.value = _uiState.value.copy(isPlaying = true, playbackError = null)
-                startProgressTracking()
-            } catch (e: Exception) {
-                setEngine(PlayerEngine.EXOPLAYER)
-            }
-        }
-    }
-
     private fun updatePlaybackNotification() {
         if (!_uiState.value.settings.notificationsEnabled) {
             PlaybackNotificationHelper.dismissNotification(getApplication())
@@ -440,48 +410,23 @@ class PlayerViewModel(
         progressTrackingJob = viewModelScope.launch {
             while (isActive) {
                 val now = System.currentTimeMillis()
-                if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-                    mpvPlayer?.let { player ->
-                        val pos = ((player.getPropertyDouble("time-pos") ?: 0.0) * 1000).toLong().coerceAtLeast(0L)
-                        val dur = ((player.getPropertyDouble("duration") ?: 0.0) * 1000).toLong().coerceAtLeast(0L)
-                        val isPaused = player.getPropertyBoolean("pause") ?: true
-                        
-                        _uiState.value = _uiState.value.copy(
-                            currentPositionMs = pos,
-                            durationMs = dur,
-                            isPlaying = !isPaused,
-                            bufferedPositionMs = pos
-                        )
-                        if (!isPaused && dur > 0 && (now - lastDbProgressSaveTimestamp >= 3000L)) {
-                            lastDbProgressSaveTimestamp = now
-                            _uiState.value.currentMedia?.let { media ->
-                                mediaRepository.updateProgress(
-                                    url = media.url,
-                                    progress = pos / 1000,
-                                    duration = dur / 1000
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    exoPlayer?.let { player ->
-                        val pos = player.currentPosition.coerceAtLeast(0L)
-                        val dur = if (player.duration > 0) player.duration else 0L
-                        val buffered = player.bufferedPosition.coerceAtLeast(0L)
-                        _uiState.value = _uiState.value.copy(
-                            currentPositionMs = pos,
-                            durationMs = dur,
-                            bufferedPositionMs = buffered
-                        )
-                        if (player.isPlaying && dur > 0 && (now - lastDbProgressSaveTimestamp >= 3000L)) {
-                            lastDbProgressSaveTimestamp = now
-                            _uiState.value.currentMedia?.let { media ->
-                                mediaRepository.updateProgress(
-                                    url = media.url,
-                                    progress = pos / 1000,
-                                    duration = dur / 1000
-                                )
-                            }
+                exoPlayer?.let { player ->
+                    val pos = player.currentPosition.coerceAtLeast(0L)
+                    val dur = if (player.duration > 0) player.duration else 0L
+                    val buffered = player.bufferedPosition.coerceAtLeast(0L)
+                    _uiState.value = _uiState.value.copy(
+                        currentPositionMs = pos,
+                        durationMs = dur,
+                        bufferedPositionMs = buffered
+                    )
+                    if (player.isPlaying && dur > 0 && (now - lastDbProgressSaveTimestamp >= 3000L)) {
+                        lastDbProgressSaveTimestamp = now
+                        _uiState.value.currentMedia?.let { media ->
+                            mediaRepository.updateProgress(
+                                url = media.url,
+                                progress = pos / 1000,
+                                duration = dur / 1000
+                            )
                         }
                     }
                 }
@@ -539,55 +484,35 @@ class PlayerViewModel(
 
         viewModelScope.launch {
             mediaRepository.saveOrUpdateMedia(cleanMedia)
-            if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-                // Ensure ExoPlayer is paused and cleared
-                exoPlayer?.pause()
-                exoPlayer?.clearMediaItems()
-                mpvPlayer?.let { player ->
-                    player.command("loadfile", cleanMedia.url)
-                    if (shouldResumeSec > 0) {
-                        player.setPropertyDouble("time-pos", shouldResumeSec.toDouble())
-                    } else {
-                        player.setPropertyDouble("time-pos", 0.0)
-                    }
-                    player.setPropertyBoolean("pause", false)
-                    _uiState.value = _uiState.value.copy(isPlaying = true)
-                    startProgressTracking()
-                    scheduleControlsAutoHide()
-                }
-            } else {
-                // Ensure MPV is paused
-                mpvPlayer?.setPropertyBoolean("pause", true)
-                exoPlayer?.let { player ->
-                    try {
-                        val uri = Uri.parse(cleanMedia.url)
-                        val mediaItem = MediaItem.Builder()
-                            .setUri(uri)
-                            .setMediaMetadata(
-                                MediaMetadata.Builder()
-                                    .setTitle(cleanMedia.title)
-                                    .setDisplayTitle(cleanMedia.title)
-                                    .setArtworkUri(if (cleanMedia.poster.isNotBlank()) Uri.parse(cleanMedia.poster) else null)
-                                    .build()
-                            )
-                            .build()
-    
-                        player.setMediaItem(mediaItem)
-                        player.prepare()
-                        if (shouldResumeSec > 0) {
-                            player.seekTo(shouldResumeSec * 1000)
-                        } else {
-                            player.seekTo(0)
-                        }
-                        player.play()
-                        updatePlaybackNotification()
-                        scheduleControlsAutoHide()
-                    } catch (e: Exception) {
-                        _uiState.value = _uiState.value.copy(
-                            playbackError = "Unable to load media: ${e.localizedMessage}",
-                            isBuffering = false
+            exoPlayer?.let { player ->
+                try {
+                    val uri = Uri.parse(cleanMedia.url)
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(uri)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(cleanMedia.title)
+                                .setDisplayTitle(cleanMedia.title)
+                                .setArtworkUri(if (cleanMedia.poster.isNotBlank()) Uri.parse(cleanMedia.poster) else null)
+                                .build()
                         )
+                        .build()
+
+                    player.setMediaItem(mediaItem)
+                    player.prepare()
+                    if (shouldResumeSec > 0) {
+                        player.seekTo(shouldResumeSec * 1000)
+                    } else {
+                        player.seekTo(0)
                     }
+                    player.play()
+                    updatePlaybackNotification()
+                    scheduleControlsAutoHide()
+                } catch (e: Exception) {
+                    _uiState.value = _uiState.value.copy(
+                        playbackError = "Unable to load media: ${e.localizedMessage}",
+                        isBuffering = false
+                    )
                 }
             }
 
@@ -676,44 +601,25 @@ class PlayerViewModel(
     fun play() {
         val current = _uiState.value.currentMedia
         if (current != null) {
-            if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-                mpvPlayer?.let { player ->
-                    val pos = (player.getPropertyDouble("time-pos") ?: 0.0) * 1000
-                    val dur = (player.getPropertyDouble("duration") ?: 0.0) * 1000
-                    if (dur > 0 && pos >= dur - 3000) {
-                        player.setPropertyDouble("time-pos", 0.0)
-                    }
-                    player.setPropertyBoolean("pause", false)
-                    _uiState.value = _uiState.value.copy(isPlaying = true)
-                    updatePlaybackNotification()
-                    scheduleControlsAutoHide()
-                    return
-                } ?: run {
+            exoPlayer?.let { player ->
+                if (player.currentMediaItem == null || player.playbackState == Player.STATE_IDLE) {
                     loadMedia(current)
                     return
                 }
-            } else {
-                exoPlayer?.let { player ->
-                    if (player.currentMediaItem == null || player.playbackState == Player.STATE_IDLE) {
-                        loadMedia(current)
-                        return
-                    }
-                    if (player.playbackState == Player.STATE_ENDED || (player.duration > 0 && player.currentPosition >= player.duration - 3000)) {
-                        player.seekTo(0)
-                    }
-                    player.play()
-                    scheduleControlsAutoHide()
-                    return
-                } ?: run {
-                    loadMedia(current)
-                    return
+                if (player.playbackState == Player.STATE_ENDED || (player.duration > 0 && player.currentPosition >= player.duration - 3000)) {
+                    player.seekTo(0)
                 }
+                player.play()
+                scheduleControlsAutoHide()
+                return
+            } ?: run {
+                loadMedia(current)
+                return
             }
         }
     }
 
     fun pause() {
-        mpvPlayer?.setPropertyBoolean("pause", true)
         exoPlayer?.pause()
         _uiState.value = _uiState.value.copy(isPlaying = false)
         flushCurrentProgressToDb()
@@ -723,30 +629,6 @@ class PlayerViewModel(
 
     fun togglePlayPause() {
         val current = _uiState.value.currentMedia
-        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-            mpvPlayer?.let { player ->
-                val isPaused = player.getPropertyBoolean("pause") ?: true
-                if (isPaused) {
-                    val pos = (player.getPropertyDouble("time-pos") ?: 0.0) * 1000
-                    val dur = (player.getPropertyDouble("duration") ?: 0.0) * 1000
-                    if (dur > 0 && pos >= dur - 3000) {
-                        player.setPropertyDouble("time-pos", 0.0)
-                    }
-                    player.setPropertyBoolean("pause", false)
-                    _uiState.value = _uiState.value.copy(isPlaying = true)
-                    scheduleControlsAutoHide()
-                } else {
-                    player.setPropertyBoolean("pause", true)
-                    _uiState.value = _uiState.value.copy(isPlaying = false)
-                    flushCurrentProgressToDb()
-                    setControlsVisibility(true)
-                }
-                updatePlaybackNotification()
-            } ?: run {
-                if (current != null) loadMedia(current)
-            }
-            return
-        }
         exoPlayer?.let { player ->
             if (player.currentMediaItem == null || player.playbackState == Player.STATE_IDLE) {
                 if (current != null) loadMedia(current)
@@ -793,23 +675,11 @@ class PlayerViewModel(
     }
 
     fun seekTo(positionMs: Long) {
-        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-            mpvPlayer?.setPropertyDouble("time-pos", positionMs / 1000.0)
-        } else {
-            exoPlayer?.seekTo(positionMs)
-        }
+        exoPlayer?.seekTo(positionMs)
         scheduleControlsAutoHide()
     }
 
     fun seekRelative(deltaMs: Long) {
-        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-            mpvPlayer?.let { player ->
-                val current = player.getPropertyDouble("time-pos") ?: 0.0
-                player.setPropertyDouble("time-pos", current + (deltaMs / 1000.0))
-                showGestureIndicator(if (deltaMs > 0) "+${deltaMs/1000}s \u23E9" else "\u23EA ${deltaMs/1000}s")
-            }
-            return
-        }
         exoPlayer?.let { player ->
             val target = (player.currentPosition + deltaMs).coerceIn(0L, if (player.duration > 0) player.duration else Long.MAX_VALUE)
             player.seekTo(target)
@@ -882,63 +752,11 @@ class PlayerViewModel(
         _uiState.value = _uiState.value.copy(resizeMode = newMode)
         showGestureIndicator(newMode.displayName)
         scheduleControlsAutoHide()
-
-        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-            mpvPlayer?.let { player ->
-                when (newMode) {
-                    VideoResizeMode.FIT -> {
-                        player.setPropertyDouble("panscan", 0.0)
-                        player.setPropertyBoolean("keepaspect", true)
-                    }
-                    VideoResizeMode.ZOOM -> {
-                        player.setPropertyDouble("panscan", 1.0)
-                        player.setPropertyBoolean("keepaspect", true)
-                    }
-                    VideoResizeMode.STRETCH -> {
-                        player.setPropertyBoolean("keepaspect", false)
-                    }
-                    VideoResizeMode.FIXED_16_9 -> {
-                        player.setPropertyDouble("panscan", 0.0)
-                        player.setPropertyBoolean("keepaspect", true)
-                        player.setPropertyDouble("video-aspect-override", 16.0 / 9.0)
-                    }
-                }
-                if (newMode != VideoResizeMode.FIXED_16_9) {
-                    player.setPropertyDouble("video-aspect-override", -1.0) // Reset override
-                }
-            }
-        }
     }
 
     fun setResizeMode(mode: VideoResizeMode) {
         _uiState.value = _uiState.value.copy(resizeMode = mode)
         scheduleControlsAutoHide()
-        
-        if (_uiState.value.selectedEngine == PlayerEngine.LIBMPV) {
-            mpvPlayer?.let { player ->
-                when (mode) {
-                    VideoResizeMode.FIT -> {
-                        player.setPropertyDouble("panscan", 0.0)
-                        player.setPropertyBoolean("keepaspect", true)
-                    }
-                    VideoResizeMode.ZOOM -> {
-                        player.setPropertyDouble("panscan", 1.0)
-                        player.setPropertyBoolean("keepaspect", true)
-                    }
-                    VideoResizeMode.STRETCH -> {
-                        player.setPropertyBoolean("keepaspect", false)
-                    }
-                    VideoResizeMode.FIXED_16_9 -> {
-                        player.setPropertyDouble("panscan", 0.0)
-                        player.setPropertyBoolean("keepaspect", true)
-                        player.setPropertyDouble("video-aspect-override", 16.0 / 9.0)
-                    }
-                }
-                if (mode != VideoResizeMode.FIXED_16_9) {
-                    player.setPropertyDouble("video-aspect-override", -1.0)
-                }
-            }
-        }
     }
 
     fun setEngine(engine: PlayerEngine) {
@@ -949,56 +767,37 @@ class PlayerViewModel(
         val currentPos = _uiState.value.currentPositionMs
         val currentMedia = _uiState.value.currentMedia
 
-        if (oldEngine == PlayerEngine.LIBMPV) {
-            mpvPlayer?.setPropertyBoolean("pause", true)
-        } else {
-            exoPlayer?.pause()
-        }
+        exoPlayer?.pause()
 
         settingsRepository.updateEngine(engine)
         _uiState.value = _uiState.value.copy(selectedEngine = engine)
         showGestureIndicator("Engine: ${engine.displayName}")
 
-        if (engine != PlayerEngine.LIBMPV) {
-            initExoPlayer(engine)
-        }
-
+        initExoPlayer(engine)
         updateTelemetry()
 
         if (currentMedia != null) {
-            if (engine == PlayerEngine.LIBMPV) {
-                exoPlayer?.clearMediaItems()
-                mpvPlayer?.let { player ->
-                    player.command("loadfile", currentMedia.url)
-                    if (currentPos > 0) {
-                        player.setPropertyDouble("time-pos", currentPos / 1000.0)
-                    }
-                    player.setPropertyBoolean("pause", !wasPlaying)
-                    _uiState.value = _uiState.value.copy(isPlaying = wasPlaying)
+            exoPlayer?.let { player ->
+                val uri = Uri.parse(currentMedia.url)
+                val mediaItem = MediaItem.Builder()
+                    .setUri(uri)
+                    .setMediaMetadata(
+                        MediaMetadata.Builder()
+                            .setTitle(currentMedia.title)
+                            .setDisplayTitle(currentMedia.title)
+                            .setArtworkUri(if (currentMedia.poster.isNotBlank()) Uri.parse(currentMedia.poster) else null)
+                            .build()
+                    )
+                    .build()
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                if (currentPos > 0) {
+                    player.seekTo(currentPos)
                 }
-            } else {
-                exoPlayer?.let { player ->
-                    val uri = Uri.parse(currentMedia.url)
-                    val mediaItem = MediaItem.Builder()
-                        .setUri(uri)
-                        .setMediaMetadata(
-                            MediaMetadata.Builder()
-                                .setTitle(currentMedia.title)
-                                .setDisplayTitle(currentMedia.title)
-                                .setArtworkUri(if (currentMedia.poster.isNotBlank()) Uri.parse(currentMedia.poster) else null)
-                                .build()
-                        )
-                        .build()
-                    player.setMediaItem(mediaItem)
-                    player.prepare()
-                    if (currentPos > 0) {
-                        player.seekTo(currentPos)
-                    }
-                    if (wasPlaying) {
-                        player.play()
-                    } else {
-                        player.pause()
-                    }
+                if (wasPlaying) {
+                    player.play()
+                } else {
+                    player.pause()
                 }
             }
         }
@@ -1080,8 +879,6 @@ class PlayerViewModel(
         PlaybackNotificationHelper.unregisterReceiver(getApplication())
         PlaybackNotificationHelper.dismissNotification(getApplication())
         exoPlayer?.release()
-        mpvPlayer?.destroy()
-        mpvPlayer = null
         exoPlayer = null
     }
 }
